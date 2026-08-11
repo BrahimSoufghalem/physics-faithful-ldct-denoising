@@ -1,14 +1,21 @@
 """Matched-budget trainer for the physics-faithful LDCT denoising study.
 
-Trains RED-CNN or ResNet (exact ldct-benchmark architectures, see
-benchmark_architectures.py) with three independently toggleable physics
-components:
+Trains any of the five ldct-benchmark architectures (RED-CNN, ResNet,
+DU-GAN generator, WGAN-VGG generator, TransCT -- see models/) with three
+independently toggleable physics components:
 
   --use-spectral-head : DC-preserving learnable radial spectral head
                         (spectral_head.py, architectural contribution)
   --nps-weight W      : radial noise-power-spectrum matching loss
                         (physics_losses.BatchRadialNPSLoss)
   --hu-bin-loss W     : HU-bin bias loss on FIXED physical tissue intervals
+
+Architecture notes
+------------------
+'dugan' and 'wganvgg' are adversarially trained methods in the benchmark
+paper; here only their GENERATORS are trained with the study loss (no
+adversarial term), so treat them as trunk ablations. 'transct' hard-codes
+512x512 inputs: use --patch-size 512 --val-patch-size 512 and a small batch.
 
 Protocol notes
 --------------
@@ -65,7 +72,6 @@ from skimage.metrics import structural_similarity as _sk_ssim
 from tqdm import tqdm
 
 import config as cfg
-from benchmark_architectures import build_benchmark_model
 from benchmark_data import (
     BENCHMARK_PIXEL_MEAN, BENCHMARK_PIXEL_STD,
     denormalize_to_pixel, prepare_benchmark_data,
@@ -74,6 +80,7 @@ from metrics import (
     compute_psnr_windowed, compute_ssim_windowed, compute_rmse_hu,
     compute_vif_hu,
 )
+from models import ARCH_CHOICES, FIXED_INPUT_SIZE, build_benchmark_model
 from physics_losses import BatchRadialNPSLoss
 from spectral_head import SpectralResidualModel
 from twenty_patient_split import TRAIN_20P, VAL_20P
@@ -116,7 +123,7 @@ def parse_args():
     p = argparse.ArgumentParser(
         description="Matched-budget trainer with optional physics components"
     )
-    p.add_argument("--arch", required=True, choices=["redcnn", "resnet"])
+    p.add_argument("--arch", required=True, choices=list(ARCH_CHOICES))
     p.add_argument("--data-dir", default=cfg.DATA_DIR)
     p.add_argument("--split", choices=["20p", "100p"], default="100p")
     p.add_argument("--max-iterations",        type=int,   default=100_000)
@@ -439,6 +446,14 @@ def main():
         raise ValueError("--train-patients must be >= 1")
     if args.val_patients is not None and args.val_patients < 1:
         raise ValueError("--val-patients must be >= 1")
+    fixed = FIXED_INPUT_SIZE.get(args.arch)
+    if fixed is not None and (args.patch_size != fixed
+                              or args.val_patch_size != fixed):
+        raise ValueError(
+            f"--arch {args.arch} hard-codes {fixed}x{fixed} inputs "
+            f"(see models/{args.arch}.py). Use --patch-size {fixed} "
+            f"--val-patch-size {fixed} with a small --batch-size."
+        )
 
     n_train, n_val = apply_split(args.split)
     if args.train_patients is not None:

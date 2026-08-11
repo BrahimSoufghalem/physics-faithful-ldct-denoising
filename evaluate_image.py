@@ -31,7 +31,6 @@ import torch
 from tqdm import tqdm
 
 import config as cfg
-from benchmark_architectures import RedCNN, ResNet
 from benchmark_data import (
     BENCHMARK_PIXEL_MEAN, BENCHMARK_PIXEL_STD,
     denormalize_to_pixel, standardize_hu,
@@ -40,6 +39,7 @@ from metrics import (
     compute_psnr_windowed, compute_ssim_windowed,
     compute_rmse_hu, compute_vif_hu,
 )
+from models import ARCH_CHOICES, build_bare_model
 from spectral_head import SpectralResidualModel
 from twenty_patient_split import TEST_20P
 from utils import (
@@ -49,8 +49,11 @@ from utils import (
 
 
 ARCH_MAP = {
-    "redcnn": "RED-CNN",
-    "resnet": "ResNet",
+    "redcnn":  "RED-CNN",
+    "resnet":  "ResNet",
+    "dugan":   "DU-GAN (gen.)",
+    "wganvgg": "WGAN-VGG (gen.)",
+    "transct": "TransCT",
 }
 
 
@@ -69,12 +72,7 @@ def load_checkpoint(path: str, arch: str, device):
     if abs(float(meta.get("pixel_std",  BENCHMARK_PIXEL_STD))  - BENCHMARK_PIXEL_STD)  > 1e-6:
         raise RuntimeError(f"[{arch}] pixel_std mismatch in checkpoint")
 
-    if arch == "redcnn":
-        model = RedCNN().to(device)
-    elif arch == "resnet":
-        model = ResNet().to(device)
-    else:
-        raise ValueError(f"Unknown arch: {arch}")
+    model = build_bare_model(arch).to(device)
 
     # Physics-informed spectral residual head (spectral_head.py). Wrap the
     # base model exactly as train.py did so state_dict keys match.
@@ -170,7 +168,8 @@ def main():
     p.add_argument("--output",    default="eval_results")
     p.add_argument("--split", choices=["20p", "100p"], default="100p")
     p.add_argument("--archs", default="redcnn,resnet",
-                   help="Comma-separated architectures to evaluate.")
+                   help="Comma-separated architectures to evaluate. "
+                        f"Available: {', '.join(ARCH_CHOICES)}.")
     args = p.parse_args()
 
     if cfg.HU_RANGE_PRESET != "benchmark":
