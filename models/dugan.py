@@ -7,10 +7,15 @@ exactly the RED-CNN network (dugan/network.py does
 lies in the dual-domain U-Net discriminators and the adversarial training,
 NOT in the generator architecture.
 
-train.py trains the GENERATOR only (MSE + optional physics losses, no
-adversarial term), so `--arch dugan` is architecturally identical to
-`--arch redcnn` under this study protocol. The U-Net discriminator below is
-kept verbatim so a faithful adversarial DU-GAN trainer can be added later.
+Two training modes exist in this repository:
+
+- train.py trains the GENERATOR only (MSE + optional physics losses, no
+  adversarial term): `--arch dugan` is then architecturally identical to
+  `--arch redcnn` (trunk ablation).
+- train_adversarial.py --arch dugan reproduces the FAITHFUL adversarial
+  DU-GAN training: dual spectral-norm U-Net discriminators (image + Sobel
+  gradient domain), LSGAN + CutMix consistency regularization, official
+  hpopt hyperparameters from configs/dugan.yaml.
 """
 
 import torch

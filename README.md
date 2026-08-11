@@ -56,6 +56,8 @@ standard windowed PSNR/SSIM/RMSE/VIF of `evaluate_image.py`.
 | `spectral_head.py` | DC-preserving learnable radial spectral head |
 | `physics_losses.py` | Radial NPS matching + HU-bin bias losses |
 | `train.py` | Matched-budget trainer (paper hyperparameters, `bench_ssim` selection, `--seed`) |
+| `train_adversarial.py` | Faithful adversarial trainers for WGAN-VGG and DU-GAN (official benchmark protocol) |
+| `adversarial_utils.py` | VGG19 perceptual loss + DU-GAN utilities (verbatim from the benchmark) |
 | `run_pilot.py` | Sequential pilot sweep (20 default configs) with combined image+physics summary |
 | `evaluate_image.py` | Test-set image-quality metrics (windowed PSNR/SSIM, RMSE, VIF) |
 | `evaluate_physics.py` | Test-set physics-fidelity metrics (NPS, HU bias) |
@@ -68,12 +70,14 @@ standard windowed PSNR/SSIM/RMSE/VIF of `evaluate_image.py`.
 
 - The spectral head wraps **any** trunk: `--use-spectral-head` works with
   every `--arch` (`redcnn`, `resnet`, `dugan`, `wganvgg`, `transct`).
-- `dugan` and `wganvgg` are adversarially trained methods in the benchmark
-  paper; here only their **generators** are trained with the study loss (no
-  adversarial term), so treat them as trunk ablations rather than method
-  reproductions. In the benchmark implementation the DU-GAN generator **is**
-  RED-CNN; the discriminators are kept verbatim in `models/` for a possible
-  faithful adversarial trainer later.
+- `dugan` and `wganvgg` have **two training modes**. `train.py` trains only
+  their generators with the study loss (trunk ablations, no adversarial
+  term). `train_adversarial.py` reproduces the **faithful adversarial
+  training** of the benchmark paper with the official hpopt hyperparameters
+  as defaults: WGAN critic + gradient penalty + VGG19 perceptual loss for
+  WGAN-VGG; dual spectral-norm U-Net discriminators (image + Sobel gradient
+  domain) with LSGAN and CutMix consistency for DU-GAN. In the benchmark
+  implementation the DU-GAN generator **is** RED-CNN.
 - `transct` hard-codes 512×512 inputs: train with `--patch-size 512
   --val-patch-size 512` and a small `--batch-size` (train.py enforces this).
 
@@ -83,6 +87,8 @@ standard windowed PSNR/SSIM/RMSE/VIF of `evaluate_image.py`.
 pip install -r requirements.txt
 # Only if you use --ssim-weight > 0:
 pip install pytorch-msssim
+# Only for train_adversarial.py --arch wganvgg (VGG19 perceptual loss):
+pip install torchvision
 ```
 
 Download the data (Mayo Clinic LDCT Grand Challenge patients, TCIA collection
@@ -133,6 +139,24 @@ python run_pilot.py --data-dir dataset \
     --train-patients 8 --val-patients 4 \
     --iters 8000 --val-every 1000
 ```
+
+### Faithful adversarial reproductions (WGAN-VGG, DU-GAN)
+
+```bash
+# Official benchmark protocol (hpopt hyperparameters and budgets by default)
+HU_RANGE_PRESET=benchmark python train_adversarial.py --arch wganvgg --data-dir dataset --split 100p
+HU_RANGE_PRESET=benchmark python train_adversarial.py --arch dugan --data-dir dataset --split 100p
+
+# Matched-budget study variant (comparable to the 30k runs above)
+HU_RANGE_PRESET=benchmark python train_adversarial.py --arch dugan --data-dir dataset --split 100p \
+    --max-iterations 30000 --iterations-before-val 1000
+```
+
+The physics components (`--use-spectral-head`, `--nps-weight`,
+`--hu-bin-loss`) are optional additions to the generator objective and
+default to OFF (faithful reproduction). Checkpoints land in
+`runs_adv/<arch>/` and are evaluated with the same `evaluate_image.py` /
+`evaluate_physics.py` commands.
 
 ### Evaluation
 

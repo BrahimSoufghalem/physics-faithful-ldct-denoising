@@ -4,11 +4,13 @@
 The only change: the unused `args: Namespace` constructor argument was
 removed from the generator (the original constructor never reads it).
 
-NOTE: in the benchmark paper WGAN-VGG is trained adversarially with a VGG
-perceptual loss. train.py trains the GENERATOR only (MSE + optional physics
-losses), so `--arch wganvgg` is a trunk ablation, not a reproduction of the
-adversarial method. The critic is kept verbatim for a possible faithful
-WGAN-VGG trainer later.
+Two training modes exist in this repository:
+
+- train.py trains the GENERATOR only (MSE + optional physics losses):
+  `--arch wganvgg` is then a trunk ablation, not the adversarial method.
+- train_adversarial.py --arch wganvgg reproduces the FAITHFUL adversarial
+  WGAN-VGG training: WGAN critic with gradient penalty + VGG19 perceptual
+  loss, official hpopt hyperparameters from configs/wganvgg.yaml.
 """
 
 from typing import List
