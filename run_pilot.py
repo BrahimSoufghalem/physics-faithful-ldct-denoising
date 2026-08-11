@@ -30,7 +30,7 @@ Usage
         --train-patients 8 --val-patients 4 \\
         --iters 8000 --val-every 1000
 
-Custom config list (one per line: "name | extra train.py flags"):
+Custom config list (one per line: \"name | extra train.py flags\"):
     python run_pilot.py --data-dir dataset --configs my_pilots.txt
 
 Outputs
@@ -57,7 +57,7 @@ os.environ.setdefault("HU_RANGE_PRESET", "benchmark")
 
 PAPER_LR = "9.583417460320728e-05"
 
-DEFAULT_CONFIGS = """\
+DEFAULT_CONFIGS = """\\
 # name | extra train.py flags
 # -- Base ablation ------------------------------------------------------
 C0              |
@@ -86,11 +86,17 @@ S2h-n0.005-h0.1 | --use-spectral-head --nps-weight 0.005 --hu-bin-loss 0.1
 S2h-n0.005-h0.2 | --use-spectral-head --nps-weight 0.005 --hu-bin-loss 0.2
 """
 
+# Keep in sync with models/__init__.py ARCH_CHOICES (inline to avoid importing
+# torch before the training subprocesses run).
+_ARCH_CHOICES = ("redcnn", "resnet", "dugan", "wganvgg", "transct")
+
 
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--data-dir", required=True)
-    p.add_argument("--arch", default="redcnn", choices=["redcnn", "resnet"])
+    p.add_argument("--arch", default="redcnn", choices=list(_ARCH_CHOICES),
+                   help="Trunk architecture (see models/). NOTE: transct "
+                        "requires --patch-size 512.")
     p.add_argument("--split", choices=["20p", "100p"], default="100p")
     p.add_argument("--train-patients", type=int, default=8)
     p.add_argument("--val-patients", type=int, default=4)
@@ -314,7 +320,7 @@ def main():
             continue
         train_one(args, name, extra, env)
 
-    # ── Combined summary ──────────────────────────────────────────────────────────
+    # ── Combined summary ──────────────────────────────────────────────────────────────
     import torch
 
     rows = []
