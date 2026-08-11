@@ -30,7 +30,7 @@ Usage
         --train-patients 8 --val-patients 4 \\
         --iters 8000 --val-every 1000
 
-Custom config list (one per line: \"name | extra train.py flags\"):
+Custom config list (one per line: "name | extra train.py flags"):
     python run_pilot.py --data-dir dataset --configs my_pilots.txt
 
 Outputs
@@ -57,7 +57,7 @@ os.environ.setdefault("HU_RANGE_PRESET", "benchmark")
 
 PAPER_LR = "9.583417460320728e-05"
 
-DEFAULT_CONFIGS = """\\
+DEFAULT_CONFIGS = """\
 # name | extra train.py flags
 # -- Base ablation ------------------------------------------------------
 C0              |

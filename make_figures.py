@@ -66,7 +66,8 @@ def parse_args():
                         "(each containing <arch>/best_model.pt).")
     p.add_argument("--labels", nargs="+", required=True,
                    help="Display name for each runs-root (same order).")
-    p.add_argument("--arch", default="redcnn", choices=["redcnn", "resnet"])
+    p.add_argument("--arch", default="redcnn",
+                   choices=["redcnn", "resnet", "dugan", "wganvgg", "transct"])
     p.add_argument("--patients", nargs="+", required=True,
                    help="Patient IDs, e.g. C121 L006.")
     p.add_argument("--slice-frac", type=float, default=0.5,

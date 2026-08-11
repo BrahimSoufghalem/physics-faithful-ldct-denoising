@@ -11,8 +11,9 @@ clinically relevant failure modes:
    (air/lung, fat, soft tissue, dense tissue, bone).
 
 This repository adds one **architectural** contribution and two **loss**
-contributions on top of exact benchmark trunks (RED-CNN, ResNet), plus a
-physics-fidelity evaluation suite that measures what they target.
+contributions on top of exact benchmark trunks (RED-CNN, ResNet, DU-GAN,
+WGAN-VGG, TransCT — see `models/`), plus a physics-fidelity evaluation suite
+that measures what they target.
 
 ## Contributions
 
@@ -51,7 +52,7 @@ standard windowed PSNR/SSIM/RMSE/VIF of `evaluate_image.py`.
 | `config.py` | Central constants: benchmark HU preset, splits, paths |
 | `download.py` | Download the Mayo/TCIA `LDCT-and-projection-data` patients (NBIA) |
 | `benchmark_data.py` | Benchmark-aligned data pipeline (MONAI, mean/std standardization) |
-| `benchmark_architectures.py` | Exact RED-CNN / ResNet trunks from ldct-benchmark |
+| `models/` | The five ldct-benchmark trunks, one file per model: RED-CNN, ResNet, DU-GAN, WGAN-VGG, TransCT |
 | `spectral_head.py` | DC-preserving learnable radial spectral head |
 | `physics_losses.py` | Radial NPS matching + HU-bin bias losses |
 | `train.py` | Matched-budget trainer (paper hyperparameters, `bench_ssim` selection, `--seed`) |
@@ -62,6 +63,19 @@ standard windowed PSNR/SSIM/RMSE/VIF of `evaluate_image.py`.
 | `plot_spectral_gain.py` | Plot the learned `G(|f|)` curve of a spectral-head checkpoint |
 | `plot_pareto.py` | Accuracy-vs-texture trade-off plot across NPS weights |
 | `metrics.py`, `utils.py`, `twenty_patient_split.py` | Shared metrics, helpers, small-split IDs |
+
+### Architecture notes
+
+- The spectral head wraps **any** trunk: `--use-spectral-head` works with
+  every `--arch` (`redcnn`, `resnet`, `dugan`, `wganvgg`, `transct`).
+- `dugan` and `wganvgg` are adversarially trained methods in the benchmark
+  paper; here only their **generators** are trained with the study loss (no
+  adversarial term), so treat them as trunk ablations rather than method
+  reproductions. In the benchmark implementation the DU-GAN generator **is**
+  RED-CNN; the discriminators are kept verbatim in `models/` for a possible
+  faithful adversarial trainer later.
+- `transct` hard-codes 512×512 inputs: train with `--patch-size 512
+  --val-patch-size 512` and a small `--batch-size` (train.py enforces this).
 
 ## Setup
 
@@ -110,6 +124,7 @@ HU_RANGE_PRESET=benchmark python train.py --arch redcnn \
 ```
 
 For multi-seed reporting add `--seed 1 --output-root runs_C0_seed1`, etc.
+For a second architecture replace `--arch redcnn` (e.g. `--arch resnet`).
 
 ### Pilot screening (cheap config ranking, not reportable)
 
