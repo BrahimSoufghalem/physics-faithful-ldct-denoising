@@ -36,6 +36,26 @@ Structural constraints (what a plain CNN cannot bypass):
   serves 128x128 training patches and 512x512 test slices (no train/test
   extent shift).
 
+Refinements (v2.1, both optional and OFF by default):
+
+* ``freeze_dc_bins=N`` pins the first N knots to G=1. Exact DC is always
+  preserved, but the lowest non-zero frequencies carry REGIONAL HU means
+  (whole-organ scale); freezing them prevents the head from trading
+  regional HU calibration for spectral fit (observed experimentally as a
+  chest soft-tissue bias of several HU) and removes the sharp near-DC gain
+  jump suspected of causing faint concentric rings in difference maps.
+* ``smoothness_penalty()`` returns a quadratic smoothness term on the
+  (effective) log-gain knots, for use as a training regularizer (see
+  train.py --gain-tv-weight). Because it is computed on the EFFECTIVE
+  curve, it also pulls the first free knot toward the frozen G=1 region.
+
+Checkpoint compatibility: freezing is implemented by recomposing the
+log-gain vector at run time (frozen entries contribute log-gain 0 and
+receive no gradient), so the state dict layout is UNCHANGED. Checkpoints
+trained with or without freezing load into either configuration; a
+frozen-trained checkpoint evaluates identically in an unfrozen model
+because its frozen entries remain at 0 (G = exp(0) = 1).
+
 Interpretability: after training, plot the learned curve with
 ``plot_spectral_gain.py``. ``G < 1`` at a band means the head RETURNS part
 of the energy the trunk wanted to remove there (protects detail /
@@ -64,15 +84,25 @@ class SpectralResidualHead(nn.Module):
         Number of radial gain knots. The knots span radial frequencies
         ``[0, sqrt(2)]`` in units of the (axis) Nyquist frequency; values
         between knots are linearly interpolated.
+    freeze_dc_bins : int
+        Pin the first ``freeze_dc_bins`` knots to G=1 (identity). With 32
+        bins each knot covers ~0.044 Nyquist units, so e.g. 2 protects
+        radial frequencies below ~0.09 Nyquist. Default 0 (no freezing,
+        previous behavior).
     """
 
     _RMAX = 2.0 ** 0.5  # corner of the 2-D frequency plane, Nyquist units
 
-    def __init__(self, n_bins: int = 32):
+    def __init__(self, n_bins: int = 32, freeze_dc_bins: int = 0):
         super().__init__()
         if n_bins < 2:
             raise ValueError(f"n_bins must be >= 2, got {n_bins}")
+        if not 0 <= int(freeze_dc_bins) < int(n_bins):
+            raise ValueError(
+                f"freeze_dc_bins must be in [0, n_bins), got {freeze_dc_bins}"
+            )
         self.n_bins = int(n_bins)
+        self.freeze_dc_bins = int(freeze_dc_bins)
         # Log-parameterization: G = exp(log_gain) > 0; init log_gain = 0
         # -> G == 1 -> the head is the identity at initialization.
         self.log_gain = nn.Parameter(torch.zeros(self.n_bins))
@@ -80,9 +110,36 @@ class SpectralResidualHead(nn.Module):
         # not parameters and are rebuilt lazily per resolution/device.
         self._grid_cache = {}
 
+    def effective_log_gain(self) -> torch.Tensor:
+        """log-gain with the first ``freeze_dc_bins`` knots pinned to 0.
+
+        Recomposition (not an in-place mask): frozen entries contribute a
+        constant 0 and receive no gradient, so they stay at their initial
+        value in the state dict and checkpoints remain fully compatible in
+        both directions.
+        """
+        if self.freeze_dc_bins == 0:
+            return self.log_gain
+        return torch.cat([
+            self.log_gain.new_zeros(self.freeze_dc_bins),
+            self.log_gain[self.freeze_dc_bins:],
+        ])
+
     def gain_curve(self) -> torch.Tensor:
         """Learned radial gain G at the knot positions, shape (n_bins,)."""
-        return torch.exp(self.log_gain)
+        return torch.exp(self.effective_log_gain())
+
+    def smoothness_penalty(self) -> torch.Tensor:
+        """Quadratic smoothness of the effective log-gain curve.
+
+        Mean squared difference of consecutive knots. Discourages sharp
+        spectral transitions (ring artifacts, abrupt near-DC jumps). Using
+        the EFFECTIVE curve also pulls the first free knot toward the
+        frozen G=1 region when ``freeze_dc_bins > 0``.
+        """
+        lg = self.effective_log_gain()
+        d = lg[1:] - lg[:-1]
+        return (d * d).mean()
 
     def _interp_grid(self, h: int, w: int, device):
         key = (h, w, str(device))
@@ -128,10 +185,12 @@ class SpectralResidualModel(nn.Module):
     (G == 1) this is exactly ``base(x)``.
     """
 
-    def __init__(self, base: nn.Module, n_bins: int = 32):
+    def __init__(self, base: nn.Module, n_bins: int = 32,
+                 freeze_dc_bins: int = 0):
         super().__init__()
         self.base = base
-        self.head = SpectralResidualHead(n_bins=n_bins)
+        self.head = SpectralResidualHead(n_bins=n_bins,
+                                         freeze_dc_bins=freeze_dc_bins)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         y_hat = self.base(x)
@@ -139,6 +198,8 @@ class SpectralResidualModel(nn.Module):
         return x - self.head(noise)
 
 
-def wrap_with_spectral_head(base: nn.Module, n_bins: int = 32) -> SpectralResidualModel:
+def wrap_with_spectral_head(base: nn.Module, n_bins: int = 32,
+                            freeze_dc_bins: int = 0) -> SpectralResidualModel:
     """Convenience constructor used by train/eval scripts."""
-    return SpectralResidualModel(base, n_bins=n_bins)
+    return SpectralResidualModel(base, n_bins=n_bins,
+                                 freeze_dc_bins=freeze_dc_bins)
