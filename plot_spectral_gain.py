@@ -16,6 +16,12 @@ Reading the curve
                expected at mid-to-high frequencies if the trunk
                over-smooths).
 * ``G > 1``  : the head removes more than the trunk at that band.
+
+v3 adaptive checkpoints: this script plots the SHARED base curve stored in
+``head.log_gain``. The per-image adaptive offsets (bounded by
+``adaptive_max_delta``) are not shown here; use
+``SpectralResidualHead.per_image_gain_curves()`` on chest vs abdomen slices
+for the anatomy-adaptive analysis figure.
 """
 
 import argparse
@@ -46,6 +52,14 @@ def main():
             "No spectral head in this checkpoint. "
             "Train with --use-spectral-head first."
         )
+    adaptive = bool(meta.get("adaptive_head", False)) or any(
+        k.endswith("head.cond_proj.weight") for k in weights
+    )
+    if adaptive:
+        print("NOTE: v3 ADAPTIVE head detected -- plotting the SHARED base "
+              "curve only. Per-image adaptive offsets are not shown; use "
+              "SpectralResidualHead.per_image_gain_curves() for the "
+              "anatomy-adaptive analysis.")
     gain = torch.exp(weights[key].detach()).numpy()
     n_bins = int(gain.shape[0])
     # Knots span [0, sqrt(2)] in units of the axis Nyquist frequency.
@@ -60,7 +74,8 @@ def main():
     plt.ylabel("Learned gain G(|f|)")
     arch = str(meta.get("architecture", "model")).upper()
     it = state.get("iteration", "?")
-    plt.title(f"Spectral residual head gain \u2014 {arch} (iter {it})")
+    plt.title(f"Spectral residual head gain \u2014 {arch} (iter {it})"
+              + (" [shared base curve]" if adaptive else ""))
     plt.legend(loc="best", fontsize=8)
     plt.grid(alpha=0.25)
     plt.tight_layout()
@@ -76,7 +91,11 @@ def main():
     print(f"Saved {args.output}.png and {args.output}.csv")
     print(f"n_bins={n_bins} | max |G-1| = {dev:.4f}"
           + ("  (WARNING: G stayed ~1 everywhere -> the head learned "
-             "nothing; consider pairing with --nps-weight)" if dev < 0.01 else ""))
+             "nothing" + (" in the SHARED curve; with an adaptive head the "
+                          "per-image offsets may still be active"
+                          if adaptive else
+                          "; consider pairing with --nps-weight") + ")"
+             if dev < 0.01 else ""))
 
 
 if __name__ == "__main__":
