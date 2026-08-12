@@ -18,6 +18,11 @@ Optional refinements (default OFF -> exact previous behavior):
                         knots (discourages sharp spectral transitions)
   --hu-bin-weights S  : per-bin weights for the HU-bin loss, comma-separated
                         in the order air,fat,soft,dense,bone (e.g. 1,1,1,3,1)
+  --adaptive-head     : v3 -- make the head's radial gain IMAGE-ADAPTIVE: a
+                        tiny conditioning encoder (~5k params) predicts
+                        bounded per-image offsets to the gain knots from
+                        the LDCT input (zero-initialized -> starts exactly
+                        at the static head). Requires --use-spectral-head.
 
 Architecture notes
 ------------------
@@ -33,7 +38,7 @@ Protocol notes
 Hyperparameters follow the official configs/redcnn.yaml of
 github.com/eeulig/ldct-benchmark (found by their hpopt), and the checkpoint
 criterion (--select-by bench_ssim) replicates
-ldctbench/methods/base.py save_checkpoint(to_optimize="SSIM"): best OVERALL
+ldctbench/methods/base.py save_checkpoint(to_optimize=\"SSIM\"): best OVERALL
 validation SSIM computed WITHOUT clinical windowing.
 
 This study uses a MATCHED training budget (30k iterations for every
@@ -57,6 +62,10 @@ Usage
 # Refined head (near-DC freeze + smooth gain) and weighted HU bins:
     ... --use-spectral-head --freeze-dc-bins 2 --gain-tv-weight 0.5 \\
         --nps-weight 0.005 --hu-bin-loss 0.2 --hu-bin-weights 1,1,1,3,1
+
+# v3 ADAPTIVE head (anatomy-adaptive per-image gain curve):
+    ... --use-spectral-head --adaptive-head --freeze-dc-bins 2 \\
+        --nps-weight 0.005 --hu-bin-loss 0.2
 
 # Losses-only control (no head):
     ... --nps-weight 0.005 --hu-bin-loss 0.2
@@ -133,7 +142,7 @@ def _get_nps_loss():
     return _NPS_LOSS
 
 
-# ────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────
 def parse_args():
     p = argparse.ArgumentParser(
         description="Matched-budget trainer with optional physics components"
@@ -164,7 +173,7 @@ def parse_args():
                         "multi-seed reporting.")
     p.add_argument("--resume", action="store_true")
 
-    # ── Pilot mode ──────────────────────────────────────────────────────────────────────────
+    # ── Pilot mode ────────────────────────────────────────────────────────────────────────────
     p.add_argument("--train-patients", type=int, default=None, metavar="N",
                    help="PILOT MODE: train on only N patients (deterministic "
                         "chest/abdomen-balanced subset). For fast config "
@@ -177,7 +186,7 @@ def parse_args():
                         "(deterministic chest/abdomen-balanced subset). "
                         "Speeds up the per-cycle validation pass.")
 
-    # ── Checkpoint selection ──────────────────────────────────────────────────────────────────
+    # ── Checkpoint selection ────────────────────────────────────────────────────────────────
     p.add_argument("--select-by", choices=list(_SELECT_CHOICES),
                    default="ssim",
                    help="Validation metric used to select best_model.pt. "
@@ -198,7 +207,7 @@ def parse_args():
                         "indicative only; full-resolution evaluate_image.py "
                         "remains the ground truth.")
 
-    # ── Physics components ────────────────────────────────────────────────────────────────────
+    # ── Physics components ──────────────────────────────────────────────────────────────────────
     p.add_argument("--use-spectral-head", action="store_true",
                    help="Physics-informed spectral residual head "
                         "(spectral_head.py): a learnable RADIAL gain G(|f|) "
@@ -225,8 +234,30 @@ def parse_args():
                         "difference of the effective curve). Discourages "
                         "sharp spectral transitions that can cause "
                         "concentric ring artifacts. Requires "
-                        "--use-spectral-head. Typical range 0.1-1.0. "
+                        "--use-spectral-head. CAUTION: 0.5 was measured to "
+                        "flatten the whole curve to ~identity (max |G-1| = "
+                        "0.0175); useful range is roughly 0.02-0.1. "
                         "Default 0 = off.")
+    p.add_argument("--adaptive-head", action="store_true",
+                   help="v3: make the spectral head's radial gain "
+                        "IMAGE-ADAPTIVE. A tiny conditioning encoder (~5k "
+                        "params: 3 strided convs + GAP + one linear layer) "
+                        "predicts bounded per-image offsets to the log-gain "
+                        "knots from the LDCT input. The projection is "
+                        "ZERO-INITIALIZED, so training starts EXACTLY at "
+                        "the static head; frozen knots (--freeze-dc-bins) "
+                        "stay frozen per image. Motivation: one shared "
+                        "curve must compromise between anatomies (measured "
+                        "chest NPS_LogL1 ~0.12 vs abdomen ~0.43). Requires "
+                        "--use-spectral-head. NOTE: adds parameters to the "
+                        "checkpoint; eval scripts rebuild the model from "
+                        "checkpoint meta automatically.")
+    p.add_argument("--adaptive-max-delta", type=float, default=0.25,
+                   metavar="D",
+                   help="Bound on the per-image |log-gain offset| for "
+                        "--adaptive-head (tanh-scaled). 0.25 lets the "
+                        "adaptive gain scale the shared curve by "
+                        "exp(+/-0.25) ~ x0.78-x1.28 per band.")
     p.add_argument("--hu-bin-loss",    type=float, default=0.0, metavar="W",
                    help="HU-bin bias penalty weight on fixed physical tissue "
                         "intervals (-1024/-500/-200/200/600/1900 HU). "
@@ -248,7 +279,7 @@ def parse_args():
                         "provides the mechanism, this loss provides the "
                         "training signal.")
 
-    # ── Generic loss flags ────────────────────────────────────────────────────────────────────
+    # ── Generic loss flags ──────────────────────────────────────────────────────────────────────
     p.add_argument("--ssim-weight", type=float, default=0.0, metavar="W",
                    help="SSIM loss weight (requires pytorch-msssim).")
     p.add_argument("--l1-weight",   type=float, default=0.0, metavar="W",
@@ -258,7 +289,7 @@ def parse_args():
     return p.parse_args()
 
 
-# ────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────
 def image_gradient_loss(pred, target):
     dx_pred   = pred  [:, :, :, 1:] - pred  [:, :, :, :-1]
     dx_target = target[:, :, :, 1:] - target[:, :, :, :-1]
@@ -342,12 +373,18 @@ def apply_split(split):
 def build_model(arch, device, args):
     model = build_benchmark_model(arch, device)
     if args.use_spectral_head:
-        freeze = int(getattr(args, "freeze_dc_bins", 0))
+        freeze    = int(getattr(args, "freeze_dc_bins", 0))
+        adaptive  = bool(getattr(args, "adaptive_head", False))
+        max_delta = float(getattr(args, "adaptive_max_delta", 0.25))
         model = SpectralResidualModel(model, n_bins=args.spectral_bins,
-                                      freeze_dc_bins=freeze).to(device)
+                                      freeze_dc_bins=freeze,
+                                      adaptive=adaptive,
+                                      max_log_gain_delta=max_delta).to(device)
         print(f"  Spectral head : ON ({args.spectral_bins} radial gain knots, "
               f"init G=1 -> starts exactly at the base model"
               + (f"; first {freeze} knots FROZEN at G=1" if freeze > 0 else "")
+              + (f"; ADAPTIVE per-image gain (max |dlog| {max_delta})"
+                 if adaptive else "")
               + ")")
     return model
 
@@ -487,7 +524,7 @@ def train_cycle(model, loader, optimizer, device, iteration, max_iter,
     return iteration, total / max(1, count)
 
 
-# ────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────
 def main():
     args = parse_args()
     if cfg.HU_RANGE_PRESET != "benchmark":
@@ -510,6 +547,10 @@ def main():
         raise ValueError("--gain-tv-weight must be >= 0")
     if args.gain_tv_weight > 0.0 and not args.use_spectral_head:
         raise ValueError("--gain-tv-weight requires --use-spectral-head")
+    if args.adaptive_head and not args.use_spectral_head:
+        raise ValueError("--adaptive-head requires --use-spectral-head")
+    if args.adaptive_max_delta <= 0.0:
+        raise ValueError("--adaptive-max-delta must be > 0")
     hu_bin_weights = None
     if args.hu_bin_weights is not None:
         if args.hu_bin_loss <= 0.0:
@@ -590,6 +631,8 @@ def main():
             head_desc += f", freezeDC={args.freeze_dc_bins}"
         if args.gain_tv_weight > 0.0:
             head_desc += f", tv={args.gain_tv_weight}"
+        if args.adaptive_head:
+            head_desc += f", adaptive(d={args.adaptive_max_delta})"
         active.append(head_desc + ")")
     if args.hu_bin_loss > 0.0:
         hb_desc = f"HU-bin(w={args.hu_bin_loss}"
@@ -690,6 +733,8 @@ def main():
             "spectral_bins":   args.spectral_bins,
             "freeze_dc_bins":  args.freeze_dc_bins,
             "gain_tv_weight":  args.gain_tv_weight,
+            "adaptive_head":   args.adaptive_head,
+            "adaptive_max_delta": args.adaptive_max_delta,
             "hu_bin_loss":     args.hu_bin_loss,
             "hu_bin_weights":  hu_bin_weights,
             "nps_weight":      args.nps_weight,
