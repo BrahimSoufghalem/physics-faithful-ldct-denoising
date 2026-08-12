@@ -10,12 +10,23 @@ independently toggleable physics components:
                         (physics_losses.BatchRadialNPSLoss)
   --hu-bin-loss W     : HU-bin bias loss on FIXED physical tissue intervals
 
+Optional refinements (default OFF -> exact previous behavior):
+
+  --freeze-dc-bins N  : pin the first N radial gain knots of the head to
+                        G=1 (protects REGIONAL HU means near DC, anti-ring)
+  --gain-tv-weight W  : quadratic smoothness penalty on the head's log-gain
+                        knots (discourages sharp spectral transitions)
+  --hu-bin-weights S  : per-bin weights for the HU-bin loss, comma-separated
+                        in the order air,fat,soft,dense,bone (e.g. 1,1,1,3,1)
+
 Architecture notes
 ------------------
 'dugan' and 'wganvgg' are adversarially trained methods in the benchmark
 paper; here only their GENERATORS are trained with the study loss (no
-adversarial term), so treat them as trunk ablations. 'transct' hard-codes
-512x512 inputs: use --patch-size 512 --val-patch-size 512 and a small batch.
+adversarial term), so treat them as trunk ablations (see
+train_adversarial.py for the faithful adversarial reproduction). 'transct'
+hard-codes 512x512 inputs: use --patch-size 512 --val-patch-size 512 and a
+small batch.
 
 Protocol notes
 --------------
@@ -42,6 +53,10 @@ Usage
 
 # Full physics model (spectral head + NPS + HU-bin losses):
     ... --use-spectral-head --nps-weight 0.005 --hu-bin-loss 0.2
+
+# Refined head (near-DC freeze + smooth gain) and weighted HU bins:
+    ... --use-spectral-head --freeze-dc-bins 2 --gain-tv-weight 0.5 \\
+        --nps-weight 0.005 --hu-bin-loss 0.2 --hu-bin-weights 1,1,1,3,1
 
 # Losses-only control (no head):
     ... --nps-weight 0.005 --hu-bin-loss 0.2
@@ -118,7 +133,7 @@ def _get_nps_loss():
     return _NPS_LOSS
 
 
-# ──────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────
 def parse_args():
     p = argparse.ArgumentParser(
         description="Matched-budget trainer with optional physics components"
@@ -149,7 +164,7 @@ def parse_args():
                         "multi-seed reporting.")
     p.add_argument("--resume", action="store_true")
 
-    # ── Pilot mode ────────────────────────────────────────────────────────────
+    # ── Pilot mode ──────────────────────────────────────────────────────────────────────────
     p.add_argument("--train-patients", type=int, default=None, metavar="N",
                    help="PILOT MODE: train on only N patients (deterministic "
                         "chest/abdomen-balanced subset). For fast config "
@@ -162,7 +177,7 @@ def parse_args():
                         "(deterministic chest/abdomen-balanced subset). "
                         "Speeds up the per-cycle validation pass.")
 
-    # ── Checkpoint selection ──────────────────────────────────────────────────
+    # ── Checkpoint selection ──────────────────────────────────────────────────────────────────
     p.add_argument("--select-by", choices=list(_SELECT_CHOICES),
                    default="ssim",
                    help="Validation metric used to select best_model.pt. "
@@ -183,7 +198,7 @@ def parse_args():
                         "indicative only; full-resolution evaluate_image.py "
                         "remains the ground truth.")
 
-    # ── Physics components ────────────────────────────────────────────────────
+    # ── Physics components ────────────────────────────────────────────────────────────────────
     p.add_argument("--use-spectral-head", action="store_true",
                    help="Physics-informed spectral residual head "
                         "(spectral_head.py): a learnable RADIAL gain G(|f|) "
@@ -194,10 +209,35 @@ def parse_args():
                         "ARCHITECTURAL addition: works with any --arch.")
     p.add_argument("--spectral-bins", type=int, default=32,
                    help="Number of radial gain knots for --use-spectral-head.")
+    p.add_argument("--freeze-dc-bins", type=int, default=0, metavar="N",
+                   help="Pin the first N radial gain knots of the spectral "
+                        "head to G=1 (identity). Exact DC is always "
+                        "preserved, but the lowest non-zero frequencies "
+                        "carry REGIONAL HU means (whole-organ scale); "
+                        "freezing them stops the head from trading regional "
+                        "HU calibration for spectral fit and removes sharp "
+                        "near-DC gain jumps (ring suspect). With 32 bins "
+                        "each knot covers ~0.044 Nyquist units; try 2-3. "
+                        "Requires --use-spectral-head. Default 0 = off.")
+    p.add_argument("--gain-tv-weight", type=float, default=0.0, metavar="W",
+                   help="Quadratic smoothness penalty on consecutive "
+                        "log-gain knots of the spectral head (mean squared "
+                        "difference of the effective curve). Discourages "
+                        "sharp spectral transitions that can cause "
+                        "concentric ring artifacts. Requires "
+                        "--use-spectral-head. Typical range 0.1-1.0. "
+                        "Default 0 = off.")
     p.add_argument("--hu-bin-loss",    type=float, default=0.0, metavar="W",
                    help="HU-bin bias penalty weight on fixed physical tissue "
                         "intervals (-1024/-500/-200/200/600/1900 HU). "
                         "Architecture-independent (works with any --arch).")
+    p.add_argument("--hu-bin-weights", type=str, default=None,
+                   metavar="W1,W2,W3,W4,W5",
+                   help="Comma-separated per-bin weights for --hu-bin-loss in "
+                        "the order air/lung, fat/low, soft, dense, bone "
+                        "(e.g. 1,1,1,3,1 to focus the stubborn dense-tissue "
+                        "bin). A weight of 0 disables a bin. Default: "
+                        "uniform weights (exact previous behavior).")
     p.add_argument("--nps-weight", type=float, default=0.0, metavar="W",
                    help="Radial noise-power-spectrum matching loss weight "
                         "(physics_losses.BatchRadialNPSLoss). Matches the "
@@ -208,7 +248,7 @@ def parse_args():
                         "provides the mechanism, this loss provides the "
                         "training signal.")
 
-    # ── Generic loss flags ────────────────────────────────────────────────────
+    # ── Generic loss flags ────────────────────────────────────────────────────────────────────
     p.add_argument("--ssim-weight", type=float, default=0.0, metavar="W",
                    help="SSIM loss weight (requires pytorch-msssim).")
     p.add_argument("--l1-weight",   type=float, default=0.0, metavar="W",
@@ -218,7 +258,7 @@ def parse_args():
     return p.parse_args()
 
 
-# ──────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────
 def image_gradient_loss(pred, target):
     dx_pred   = pred  [:, :, :, 1:] - pred  [:, :, :, :-1]
     dx_target = target[:, :, :, 1:] - target[:, :, :, :-1]
@@ -228,7 +268,7 @@ def image_gradient_loss(pred, target):
 
 
 def compute_loss(pred, target, ssim_weight=0.0, l1_weight=0.0, grad_weight=0.0,
-                 hu_bin_loss_weight=0.0,
+                 hu_bin_loss_weight=0.0, hu_bin_weights=None,
                  input_img=None, nps_weight=0.0):
     mse_w = max(0.0, 1.0 - float(ssim_weight) - float(l1_weight))
     loss  = pred.new_zeros(())
@@ -248,7 +288,8 @@ def compute_loss(pred, target, ssim_weight=0.0, l1_weight=0.0, grad_weight=0.0,
     if grad_weight > 0.0:
         loss = loss + float(grad_weight) * image_gradient_loss(pred, target)
     if hu_bin_loss_weight > 0.0:
-        loss = loss + hu_bin_loss_weight * hu_bin_bias_loss(pred, target)
+        loss = loss + hu_bin_loss_weight * hu_bin_bias_loss(
+            pred, target, bin_weights=hu_bin_weights)
     if nps_weight > 0.0:
         if input_img is None:
             raise ValueError("--nps-weight requires the network input image")
@@ -260,27 +301,34 @@ def compute_loss(pred, target, ssim_weight=0.0, l1_weight=0.0, grad_weight=0.0,
     return loss
 
 
-def hu_bin_bias_loss(pred, target):
+def hu_bin_bias_loss(pred, target, bin_weights=None):
     """Mean-bias penalty inside FIXED physical tissue intervals.
 
     The boundaries are the fixed physical intervals also used by
     physics_losses.HUBinBiasLoss, converted to the benchmark-standardized
-    domain.
+    domain. ``bin_weights`` (length 5, order air/lung, fat/low, soft, dense,
+    bone) weights each bin's squared bias and the result is normalized by
+    the total weight of the PRESENT bins; ``None`` means uniform weights,
+    which reproduces the original unweighted behavior exactly.
     """
     edges = [
         (b + 1024.0 - BENCHMARK_PIXEL_MEAN) / BENCHMARK_PIXEL_STD
         for b in _HU_BIN_BOUNDARIES_HU
     ]
-    loss  = pred.new_zeros(())
-    count = 0
-    for lo, hi in zip(edges[:-1], edges[1:]):
+    if bin_weights is None:
+        bin_weights = [1.0] * (len(edges) - 1)
+    loss = pred.new_zeros(())
+    wsum = 0.0
+    for w, (lo, hi) in zip(bin_weights, zip(edges[:-1], edges[1:])):
+        if w <= 0.0:
+            continue
         mask = (target >= lo) & (target < hi)
         if int(mask.sum()) < 10:
             continue
-        bias  = (pred[mask] - target[mask]).mean()
-        loss  = loss + bias * bias
-        count += 1
-    return loss / max(1, count)
+        bias = (pred[mask] - target[mask]).mean()
+        loss = loss + float(w) * bias * bias
+        wsum += float(w)
+    return loss / max(1.0, wsum)
 
 
 def apply_split(split):
@@ -294,9 +342,13 @@ def apply_split(split):
 def build_model(arch, device, args):
     model = build_benchmark_model(arch, device)
     if args.use_spectral_head:
-        model = SpectralResidualModel(model, n_bins=args.spectral_bins).to(device)
+        freeze = int(getattr(args, "freeze_dc_bins", 0))
+        model = SpectralResidualModel(model, n_bins=args.spectral_bins,
+                                      freeze_dc_bins=freeze).to(device)
         print(f"  Spectral head : ON ({args.spectral_bins} radial gain knots, "
-              f"init G=1 -> starts exactly at the base model)")
+              f"init G=1 -> starts exactly at the base model"
+              + (f"; first {freeze} knots FROZEN at G=1" if freeze > 0 else "")
+              + ")")
     return model
 
 
@@ -399,8 +451,8 @@ def lr_at(iteration, base_lr, min_lr, max_iter, schedule):
 
 def train_cycle(model, loader, optimizer, device, iteration, max_iter,
                 ssim_weight=0.0, l1_weight=0.0, grad_weight=0.0,
-                hu_bin_loss_weight=0.0,
-                nps_weight=0.0,
+                hu_bin_loss_weight=0.0, hu_bin_weights=None,
+                nps_weight=0.0, gain_tv_weight=0.0,
                 base_lr=1e-4, min_lr=1e-6, lr_schedule="constant"):
     model.train()
     total = count = 0.0
@@ -418,7 +470,13 @@ def train_cycle(model, loader, optimizer, device, iteration, max_iter,
         loss = compute_loss(pred, y, ssim_weight=ssim_weight, l1_weight=l1_weight,
                             grad_weight=grad_weight,
                             hu_bin_loss_weight=hu_bin_loss_weight,
+                            hu_bin_weights=hu_bin_weights,
                             input_img=x, nps_weight=nps_weight)
+        if gain_tv_weight > 0.0:
+            # Quadratic smoothness on the spectral head's log-gain knots.
+            # main() only allows this weight with --use-spectral-head, so
+            # ``model`` is a SpectralResidualModel here.
+            loss = loss + float(gain_tv_weight) * model.head.smoothness_penalty()
         loss.backward()
         optimizer.step()
         iteration += 1
@@ -429,7 +487,7 @@ def train_cycle(model, loader, optimizer, device, iteration, max_iter,
     return iteration, total / max(1, count)
 
 
-# ──────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────
 def main():
     args = parse_args()
     if cfg.HU_RANGE_PRESET != "benchmark":
@@ -442,6 +500,34 @@ def main():
         raise ValueError("--nps-weight must be >= 0")
     if args.spectral_bins < 2:
         raise ValueError("--spectral-bins must be >= 2")
+    if args.freeze_dc_bins < 0:
+        raise ValueError("--freeze-dc-bins must be >= 0")
+    if args.freeze_dc_bins > 0 and not args.use_spectral_head:
+        raise ValueError("--freeze-dc-bins requires --use-spectral-head")
+    if args.use_spectral_head and args.freeze_dc_bins >= args.spectral_bins:
+        raise ValueError("--freeze-dc-bins must be < --spectral-bins")
+    if args.gain_tv_weight < 0.0:
+        raise ValueError("--gain-tv-weight must be >= 0")
+    if args.gain_tv_weight > 0.0 and not args.use_spectral_head:
+        raise ValueError("--gain-tv-weight requires --use-spectral-head")
+    hu_bin_weights = None
+    if args.hu_bin_weights is not None:
+        if args.hu_bin_loss <= 0.0:
+            raise ValueError("--hu-bin-weights requires --hu-bin-loss > 0")
+        try:
+            hu_bin_weights = [float(v) for v in args.hu_bin_weights.split(",")]
+        except ValueError:
+            raise ValueError(
+                "--hu-bin-weights must be comma-separated numbers")
+        n_bins_expected = len(_HU_BIN_BOUNDARIES_HU) - 1
+        if len(hu_bin_weights) != n_bins_expected:
+            raise ValueError(
+                f"--hu-bin-weights needs exactly {n_bins_expected} values "
+                "(air/lung, fat/low, soft, dense, bone)")
+        if any(w < 0.0 for w in hu_bin_weights):
+            raise ValueError("--hu-bin-weights must be >= 0")
+        if all(w == 0.0 for w in hu_bin_weights):
+            raise ValueError("--hu-bin-weights must not be all zero")
     if args.train_patients is not None and args.train_patients < 1:
         raise ValueError("--train-patients must be >= 1")
     if args.val_patients is not None and args.val_patients < 1:
@@ -490,13 +576,26 @@ def main():
     loss_desc = " + ".join(loss_parts) if loss_parts else "1.00*MSE"
     if args.hu_bin_loss > 0.0:
         loss_desc += f" + {args.hu_bin_loss}*HU-bin"
+        if hu_bin_weights is not None:
+            loss_desc += f"(w={','.join(str(w) for w in hu_bin_weights)})"
     if args.nps_weight > 0.0:
         loss_desc += f" + {args.nps_weight}*NPS"
+    if args.gain_tv_weight > 0.0:
+        loss_desc += f" + {args.gain_tv_weight}*GainSmooth"
 
     active = []
     if args.use_spectral_head:
-        active.append(f"Spectral-Head(bins={args.spectral_bins})")
-    if args.hu_bin_loss > 0.0: active.append(f"HU-bin(w={args.hu_bin_loss})")
+        head_desc = f"Spectral-Head(bins={args.spectral_bins}"
+        if args.freeze_dc_bins > 0:
+            head_desc += f", freezeDC={args.freeze_dc_bins}"
+        if args.gain_tv_weight > 0.0:
+            head_desc += f", tv={args.gain_tv_weight}"
+        active.append(head_desc + ")")
+    if args.hu_bin_loss > 0.0:
+        hb_desc = f"HU-bin(w={args.hu_bin_loss}"
+        if hu_bin_weights is not None:
+            hb_desc += f", bins={','.join(str(w) for w in hu_bin_weights)}"
+        active.append(hb_desc + ")")
     if args.nps_weight > 0.0:  active.append(f"NPS(w={args.nps_weight})")
     active_str = ", ".join(active) if active else "none (baseline)"
 
@@ -573,7 +672,9 @@ def main():
             l1_weight=args.l1_weight,
             grad_weight=args.grad_weight,
             hu_bin_loss_weight=args.hu_bin_loss,
+            hu_bin_weights=hu_bin_weights,
             nps_weight=args.nps_weight,
+            gain_tv_weight=args.gain_tv_weight,
             base_lr=args.lr,
             min_lr=args.min_lr,
             lr_schedule=args.lr_schedule,
@@ -587,7 +688,10 @@ def main():
             "seed":            int(args.seed),
             "use_spectral_head": args.use_spectral_head,
             "spectral_bins":   args.spectral_bins,
+            "freeze_dc_bins":  args.freeze_dc_bins,
+            "gain_tv_weight":  args.gain_tv_weight,
             "hu_bin_loss":     args.hu_bin_loss,
+            "hu_bin_weights":  hu_bin_weights,
             "nps_weight":      args.nps_weight,
             "ssim_weight":     args.ssim_weight,
             "l1_weight":       args.l1_weight,
