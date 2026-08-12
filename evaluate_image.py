@@ -18,8 +18,10 @@ Usage
 Note
 ----
 Checkpoints saved by train.py store the physics configuration in meta
-("use_spectral_head", "spectral_bins"); the model is rebuilt to match the
-saved weights exactly.
+("use_spectral_head", "spectral_bins", "freeze_dc_bins", "adaptive_head",
+"adaptive_max_delta"); the model is rebuilt to match the saved weights
+exactly. The v3 adaptive head adds parameters, so rebuilding from meta is
+REQUIRED for adaptive checkpoints (strict state-dict loading).
 """
 
 import argparse
@@ -75,11 +77,24 @@ def load_checkpoint(path: str, arch: str, device):
     model = build_bare_model(arch).to(device)
 
     # Physics-informed spectral residual head (spectral_head.py). Wrap the
-    # base model exactly as train.py did so state_dict keys match.
+    # base model exactly as train.py did so state_dict keys match. The v3
+    # adaptive head ADDS parameters (cond_encoder/cond_proj), and
+    # adaptive_max_delta scales the offsets at forward time, so both must
+    # be restored from meta. freeze_dc_bins does not change the state dict
+    # but is restored for exact forward-pass parity.
     if bool(meta.get("use_spectral_head", False)):
-        n_bins = int(meta.get("spectral_bins", 32))
-        print(f"  Wrapping with SpectralResidualHead ({n_bins} radial gain knots)")
-        model = SpectralResidualModel(model, n_bins=n_bins).to(device)
+        n_bins   = int(meta.get("spectral_bins", 32))
+        freeze   = int(meta.get("freeze_dc_bins", 0))
+        adaptive = bool(meta.get("adaptive_head", False))
+        max_delta = float(meta.get("adaptive_max_delta", 0.25))
+        print(f"  Wrapping with SpectralResidualHead ({n_bins} radial gain knots"
+              + (f", freezeDC={freeze}" if freeze > 0 else "")
+              + (f", ADAPTIVE (max |dlog| {max_delta})" if adaptive else "")
+              + ")")
+        model = SpectralResidualModel(
+            model, n_bins=n_bins, freeze_dc_bins=freeze,
+            adaptive=adaptive, max_log_gain_delta=max_delta,
+        ).to(device)
 
     weights = state.get("model_state_dict", state)
     model.load_state_dict(weights, strict=True)
