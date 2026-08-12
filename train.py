@@ -23,6 +23,13 @@ Optional refinements (default OFF -> exact previous behavior):
                         bounded per-image offsets to the gain knots from
                         the LDCT input (zero-initialized -> starts exactly
                         at the static head). Requires --use-spectral-head.
+  --adaptive-center-weight W : penalty pulling the BATCH-MEAN adaptive
+                        offset to zero, per bin. Fixes the measured
+                        degeneration where the offsets saturate to a
+                        constant for ALL images (a trunk-absorbable global
+                        shift): the shared curve should carry the static
+                        part, the adaptive path only per-image
+                        DIFFERENCES. Requires --adaptive-head.
 
 Architecture notes
 ------------------
@@ -63,8 +70,9 @@ Usage
     ... --use-spectral-head --freeze-dc-bins 2 --gain-tv-weight 0.5 \\
         --nps-weight 0.005 --hu-bin-loss 0.2 --hu-bin-weights 1,1,1,3,1
 
-# v3 ADAPTIVE head (anatomy-adaptive per-image gain curve):
+# v3 ADAPTIVE head (anatomy-adaptive per-image gain curve, centered):
     ... --use-spectral-head --adaptive-head --freeze-dc-bins 2 \\
+        --adaptive-center-weight 0.05 \\
         --nps-weight 0.005 --hu-bin-loss 0.2
 
 # Losses-only control (no head):
@@ -186,7 +194,7 @@ def parse_args():
                         "(deterministic chest/abdomen-balanced subset). "
                         "Speeds up the per-cycle validation pass.")
 
-    # ── Checkpoint selection ────────────────────────────────────────────────────────────────
+    # ── Checkpoint selection ──────────────────────────────────────────────────────────────
     p.add_argument("--select-by", choices=list(_SELECT_CHOICES),
                    default="ssim",
                    help="Validation metric used to select best_model.pt. "
@@ -207,7 +215,7 @@ def parse_args():
                         "indicative only; full-resolution evaluate_image.py "
                         "remains the ground truth.")
 
-    # ── Physics components ──────────────────────────────────────────────────────────────────────
+    # ── Physics components ────────────────────────────────────────────────────────────────────
     p.add_argument("--use-spectral-head", action="store_true",
                    help="Physics-informed spectral residual head "
                         "(spectral_head.py): a learnable RADIAL gain G(|f|) "
@@ -258,6 +266,20 @@ def parse_args():
                         "--adaptive-head (tanh-scaled). 0.25 lets the "
                         "adaptive gain scale the shared curve by "
                         "exp(+/-0.25) ~ x0.78-x1.28 per band.")
+    p.add_argument("--adaptive-center-weight", type=float, default=0.0,
+                   metavar="W",
+                   help="Quadratic penalty pulling the BATCH-MEAN adaptive "
+                        "log-gain offset to zero, per bin. Motivation "
+                        "(measured on the S4 run): without it the offsets "
+                        "saturate at -max_delta for ALL images and all "
+                        "bands -- a global static shift the trunk can "
+                        "absorb -- instead of encoding per-image "
+                        "DIFFERENCES. Centering makes the shared curve "
+                        "carry the static part and reserves the adaptive "
+                        "path for genuine inter-image variation (and keeps "
+                        "tanh out of its zero-gradient saturation zone). "
+                        "Try 0.05. Requires --adaptive-head. Default 0 = "
+                        "off (exact previous behavior).")
     p.add_argument("--hu-bin-loss",    type=float, default=0.0, metavar="W",
                    help="HU-bin bias penalty weight on fixed physical tissue "
                         "intervals (-1024/-500/-200/200/600/1900 HU). "
@@ -279,7 +301,7 @@ def parse_args():
                         "provides the mechanism, this loss provides the "
                         "training signal.")
 
-    # ── Generic loss flags ──────────────────────────────────────────────────────────────────────
+    # ── Generic loss flags ────────────────────────────────────────────────────────────────────
     p.add_argument("--ssim-weight", type=float, default=0.0, metavar="W",
                    help="SSIM loss weight (requires pytorch-msssim).")
     p.add_argument("--l1-weight",   type=float, default=0.0, metavar="W",
@@ -490,6 +512,7 @@ def train_cycle(model, loader, optimizer, device, iteration, max_iter,
                 ssim_weight=0.0, l1_weight=0.0, grad_weight=0.0,
                 hu_bin_loss_weight=0.0, hu_bin_weights=None,
                 nps_weight=0.0, gain_tv_weight=0.0,
+                adaptive_center_weight=0.0,
                 base_lr=1e-4, min_lr=1e-6, lr_schedule="constant"):
     model.train()
     total = count = 0.0
@@ -514,6 +537,18 @@ def train_cycle(model, loader, optimizer, device, iteration, max_iter,
             # main() only allows this weight with --use-spectral-head, so
             # ``model`` is a SpectralResidualModel here.
             loss = loss + float(gain_tv_weight) * model.head.smoothness_penalty()
+        if adaptive_center_weight > 0.0:
+            # Pull the BATCH-MEAN adaptive offset to zero, per bin: the
+            # shared log_gain should carry any static gain shift; the
+            # adaptive path should encode per-image DIFFERENCES only
+            # (anti-saturation, see --adaptive-center-weight help).
+            # main() only allows this weight with --adaptive-head, so
+            # ``model.head`` is adaptive here. The extra encoder forward
+            # is negligible (~5k params).
+            delta = model.head.log_gain_delta(x)
+            loss = loss + float(adaptive_center_weight) * (
+                delta.mean(dim=0) ** 2
+            ).mean()
         loss.backward()
         optimizer.step()
         iteration += 1
@@ -551,6 +586,10 @@ def main():
         raise ValueError("--adaptive-head requires --use-spectral-head")
     if args.adaptive_max_delta <= 0.0:
         raise ValueError("--adaptive-max-delta must be > 0")
+    if args.adaptive_center_weight < 0.0:
+        raise ValueError("--adaptive-center-weight must be >= 0")
+    if args.adaptive_center_weight > 0.0 and not args.adaptive_head:
+        raise ValueError("--adaptive-center-weight requires --adaptive-head")
     hu_bin_weights = None
     if args.hu_bin_weights is not None:
         if args.hu_bin_loss <= 0.0:
@@ -623,6 +662,8 @@ def main():
         loss_desc += f" + {args.nps_weight}*NPS"
     if args.gain_tv_weight > 0.0:
         loss_desc += f" + {args.gain_tv_weight}*GainSmooth"
+    if args.adaptive_center_weight > 0.0:
+        loss_desc += f" + {args.adaptive_center_weight}*AdaptCenter"
 
     active = []
     if args.use_spectral_head:
@@ -632,7 +673,10 @@ def main():
         if args.gain_tv_weight > 0.0:
             head_desc += f", tv={args.gain_tv_weight}"
         if args.adaptive_head:
-            head_desc += f", adaptive(d={args.adaptive_max_delta})"
+            head_desc += f", adaptive(d={args.adaptive_max_delta}"
+            if args.adaptive_center_weight > 0.0:
+                head_desc += f", center={args.adaptive_center_weight}"
+            head_desc += ")"
         active.append(head_desc + ")")
     if args.hu_bin_loss > 0.0:
         hb_desc = f"HU-bin(w={args.hu_bin_loss}"
@@ -718,6 +762,7 @@ def main():
             hu_bin_weights=hu_bin_weights,
             nps_weight=args.nps_weight,
             gain_tv_weight=args.gain_tv_weight,
+            adaptive_center_weight=args.adaptive_center_weight,
             base_lr=args.lr,
             min_lr=args.min_lr,
             lr_schedule=args.lr_schedule,
@@ -735,6 +780,7 @@ def main():
             "gain_tv_weight":  args.gain_tv_weight,
             "adaptive_head":   args.adaptive_head,
             "adaptive_max_delta": args.adaptive_max_delta,
+            "adaptive_center_weight": args.adaptive_center_weight,
             "hu_bin_loss":     args.hu_bin_loss,
             "hu_bin_weights":  hu_bin_weights,
             "nps_weight":      args.nps_weight,
