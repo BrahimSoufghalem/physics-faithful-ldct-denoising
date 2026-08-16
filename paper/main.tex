@@ -1,0 +1,51 @@
+% =============================================================
+% Physics-Faithful Low-Dose CT Denoising via an Anatomy-Adaptive,
+% DC-Preserving Spectral Head -- arXiv two-column draft
+% Build: pdflatex main  (PNG figures must be placed in paper/figs/,
+% see paper/README.md for the required file names)
+% =============================================================
+\documentclass[twocolumn,10pt]{article}
+
+\usepackage[a4paper,margin=2.0cm,columnsep=0.7cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{newtxtext,newtxmath}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{microtype}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc}
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+
+\graphicspath{{figs/}}
+
+% ---- shorthand macros ----
+\newcommand{\npsl}{NPS\textsubscript{LogL1}}
+\newcommand{\npsc}{NPS\textsubscript{Corr}}
+\newcommand{\stdr}{NoiseSTD\textsubscript{Ratio}}
+\newcommand{\hu}{\,HU}
+\newcommand{\wnps}{w_{\mathrm{nps}}}
+\newcommand{\whu}{w_{\mathrm{hu}}}
+
+\title{\bfseries Physics-Faithful Low-Dose CT Denoising via an\\ Anatomy-Adaptive, DC-Preserving Spectral Head}
+\author{Brahim Soufghalem\\[2pt]
+\normalsize Universit\'e 20 Ao\^ut 1955 -- Skikda, Skikda, Algeria\\
+\normalsize \texttt{brahimsoufghalem@outlook.com}\\[2pt]
+\normalsize Code: \url{https://github.com/BrahimSoufghalem/physics-faithful-ldct-denoising}}
+\date{}
+
+\begin{document}
+\maketitle
+
+\input{sections/0_abstract}
+\input{sections/1_introduction}
+\input{sections/2_related_work}
+\input{sections/3_method}
+\input{sections/4_setup}
+\input{sections/5_results}
+\input{sections/6_discussion}
+\input{sections/references}
+
+\end{document}
