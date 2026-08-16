@@ -19,25 +19,26 @@ No BibTeX needed — references are embedded (`sections/references.tex`).
 - `sections/references.tex` — 12 verified references (`thebibliography`)
 - `figures/fig1_architecture.tex` — Fig. 1 architecture schematic (TikZ, compiled inline)
 
-## Figure files
+## ⚠️ Required figure files (add manually)
 
-The required PNG figures are stored in `paper/figures/`:
+The PNG figures exist only as chat/Notion attachments and must be copied
+from your local machine into `paper/figs/` with EXACTLY these names:
 
 | File | Content |
 | --- | --- |
-| `figures/nps_C121.png` | Chest (C121) radial NPS, removed vs reference noise |
-| `figures/nps_L006.png` | Abdomen (L006) radial NPS, removed vs reference noise |
-| `figures/adaptive_gain_S4b.png` | S4b per-image adaptive gain curves by anatomy (RED-CNN) |
-| `figures/adaptive_gain_S4.png` | S4 naive-adaptive saturation diagnostic |
-| `figures/compare_C121_s196.png` | Chest qualitative panel (C121, slice 196) |
-| `figures/compare_L006_s107.png` | Abdomen qualitative panel (L006, slice 107) |
-| `figures/adaptive_gain_S4b_resnet.png` | S4b-on-ResNet gain curves (cross-trunk diagnosis) |
+| `figs/fig2_nps_chest.png` | Chest (C121) radial NPS, removed vs reference noise |
+| `figs/fig3_nps_abdomen.png` | Abdomen (L006) radial NPS, removed vs reference noise |
+| `figs/fig4_gain_curves_s4b.png` | S4b per-image adaptive gain curves by anatomy (RED-CNN) |
+| `figs/fig5_gain_curves_s4_naive.png` | S4 naive-adaptive saturation diagnostic |
+| `figs/fig6_qualitative_chest.png` | Chest qualitative panel (C121, slice 196) |
+| `figs/fig7_qualitative_abdomen.png` | Abdomen qualitative panel (L006, slice 107) |
+| `figs/fig8_gain_curves_resnet.png` | S4b-on-ResNet gain curves (cross-trunk diagnosis) |
 
-Fig. 1 needs no PNG file — it is drawn in TikZ.
+Fig. 1 needs no file — it is drawn in TikZ.
 
 ## Remaining before submission
 
-- [ ] Build the paper twice with `pdflatex` and inspect the resulting PDF
+- [ ] Copy the 7 PNGs into `paper/figs/` (names above) and build
 - [ ] Final visual pass on Fig. 1 TikZ spacing after first compile
 - [ ] Decide arXiv category (eess.IV primary, cs.CV cross-list suggested)
 - [ ] Make repository public at submission
