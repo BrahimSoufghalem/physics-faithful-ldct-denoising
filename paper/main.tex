@@ -1,49 +1,27 @@
 % =============================================================
 % Physics-Faithful Low-Dose CT Denoising via an Anatomy-Adaptive,
 % DC-Preserving Spectral Head -- arXiv two-column draft
-% Build: pdflatex main  (PNG figures must be placed in paper/figures/)
+% Build: pdflatex main  (PNG figures must be placed in paper/figures/,
+% see paper/README.md for the required file names)
 % =============================================================
 \documentclass[twocolumn,10pt]{article}
 
-% ---- Page geometry and typography ----
-\usepackage[a4paper,top=1.85cm,bottom=1.85cm,left=1.75cm,right=1.75cm,columnsep=0.72cm]{geometry}
+\usepackage[a4paper,margin=2.0cm,columnsep=0.7cm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{newtxtext,newtxmath}
-\usepackage{microtype}
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{caption}
-\usepackage{enumitem}
-\usepackage{titlesec}
+\usepackage{microtype}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit,calc}
 \usepackage[colorlinks=true,allcolors=blue]{hyperref}
 
 \graphicspath{{figures/}}
 
-% ---- Publication-quality spacing and hierarchy ----
-\setlength{\parindent}{1em}
-\setlength{\parskip}{0pt}
-\setlength{\emergencystretch}{2em}
-\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
-\setlength{\floatsep}{7pt plus 2pt minus 2pt}
-\setlength{\intextsep}{8pt plus 2pt minus 2pt}
-\setlength{\abovecaptionskip}{5pt}
-\setlength{\belowcaptionskip}{1pt}
-\captionsetup{font=small,labelfont=bf,labelsep=period,justification=raggedright,singlelinecheck=false}
-\captionsetup[table]{position=top}
-\titlespacing*{\section}{0pt}{10pt plus 2pt minus 1pt}{5pt plus 1pt minus 1pt}
-\titlespacing*{\subsection}{0pt}{8pt plus 2pt minus 1pt}{3pt plus 1pt minus 1pt}
-\titlespacing*{\subsubsection}{0pt}{6pt plus 1pt minus 1pt}{2pt}
-\titleformat{\section}{\normalfont\large\bfseries}{\thesection.}{0.5em}{}
-\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection}{0.5em}{}
-\titleformat{\subsubsection}{\normalfont\normalsize\itshape}{\thesubsubsection}{0.5em}{}
-\setlist[itemize]{leftmargin=*,topsep=3pt,itemsep=1pt,parsep=0pt}
-\setlist[enumerate]{leftmargin=*,topsep=3pt,itemsep=2pt,parsep=0pt}
-
-% ---- Shorthand macros ----
+% ---- shorthand macros ----
 \newcommand{\npsl}{NPS\textsubscript{LogL1}}
 \newcommand{\npsc}{NPS\textsubscript{Corr}}
 \newcommand{\stdr}{NoiseSTD\textsubscript{Ratio}}
@@ -51,10 +29,8 @@
 \newcommand{\wnps}{w_{\mathrm{nps}}}
 \newcommand{\whu}{w_{\mathrm{hu}}}
 
-% ---- Title block ----
-\title{\bfseries\LARGE Physics-Faithful Low-Dose CT Denoising via an\\[2pt]
-Anatomy-Adaptive, DC-Preserving Spectral Head}
-\author{Brahim Soufghalem\\[3pt]
+\title{\bfseries Physics-Faithful Low-Dose CT Denoising via an\\ Anatomy-Adaptive, DC-Preserving Spectral Head}
+\author{Brahim Soufghalem\\[2pt]
 \normalsize Universit\'e 20 Ao\^ut 1955 -- Skikda, Skikda, Algeria\\
 \normalsize \texttt{brahimsoufghalem@outlook.com}\\[2pt]
 \normalsize Code: \url{https://github.com/BrahimSoufghalem/physics-faithful-ldct-denoising}}
@@ -62,7 +38,6 @@ Anatomy-Adaptive, DC-Preserving Spectral Head}
 
 \begin{document}
 \maketitle
-\vspace{-1.0em}
 
 \input{sections/0_abstract}
 \input{sections/1_introduction}
