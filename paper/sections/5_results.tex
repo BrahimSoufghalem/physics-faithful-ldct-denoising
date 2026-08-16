@@ -90,14 +90,14 @@ Figures~\ref{fig:nps_chest} and~\ref{fig:nps_abd} make the mechanism visible. In
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig2_nps_chest.png}
+  \includegraphics[width=\linewidth]{nps_C121.png}
   \caption{Chest (C121): radial NPS of removed vs.\ reference noise. The baseline under-removes low-frequency noise (dip at ${\approx}0.05$ cycles/pixel); with the spectral head, the removed-noise NPS is nearly indistinguishable from the reference across the spectrum.}
   \label{fig:nps_chest}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig3_nps_abdomen.png}
+  \includegraphics[width=\linewidth]{nps_L006.png}
   \caption{Abdomen (L006): radial NPS of removed vs.\ reference noise. The baseline's ${\sim}7\times$ low-frequency hole is largely closed by the head; a residual low--mid-frequency gap and a slight overshoot above 0.6 cycles/pixel remain.}
   \label{fig:nps_abd}
 \end{figure}
@@ -152,14 +152,14 @@ Qualitative panels (Figs.~\ref{fig:qual_chest}--\ref{fig:qual_abd}) confirm that
 
 \begin{figure*}[t]
   \centering
-  \includegraphics[width=\textwidth]{fig6_qualitative_chest.png}
+  \includegraphics[width=\textwidth]{compare_C121_s196.png}
   \caption{Chest qualitative panel (C121, slice 196; window $c{=}{-}600$/$w{=}1500$): LDCT / RED-CNN / RED-CNN+Spectral / NDCT with $\pm 100$\hu{} difference maps and ROI crops. ROI means sit within a few HU of NDCT for both denoisers; the head's difference map shows reduced unstructured residual.}
   \label{fig:qual_chest}
 \end{figure*}
 
 \begin{figure*}[t]
   \centering
-  \includegraphics[width=\textwidth]{fig7_qualitative_abdomen.png}
+  \includegraphics[width=\textwidth]{compare_L006_s107.png}
   \caption{Abdomen qualitative panel (L006, slice 107; window $c{=}50$/$w{=}400$): same layout, $\pm 50$\hu{} difference maps. Soft-tissue ROI means match NDCT within ${\approx}1$\hu{}; the head's residual concentrates at anatomical edges rather than broad speckle.}
   \label{fig:qual_abd}
 \end{figure*}
@@ -171,14 +171,14 @@ The learned gain curves are directly plottable. The shared curve returns noise m
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig4_gain_curves_s4b.png}
+  \includegraphics[width=\linewidth]{adaptive_gain_S4b.png}
   \caption{Proposed (S4b): per-image adaptive gain curves grouped by anatomy ($n = 100$ per anatomy; 30k matched budget, test set, seed 0). Chest curves lie consistently above abdomen curves; $G = 1$ at the two frozen near-DC knots for every image.}
   \label{fig:gain_s4b}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig5_gain_curves_s4_naive.png}
+  \includegraphics[width=\linewidth]{adaptive_gain_S4.png}
   \caption{Saturation diagnostic (S4, naive adaptive): all per-image curves collapse a factor $\exp(-0.25)$ below the shared curve --- the degeneration that motivates the batch-centering penalty (same protocol as Fig.~\ref{fig:gain_s4b}).}
   \label{fig:gain_s4}
 \end{figure}
@@ -206,7 +206,7 @@ On ResNet, the head improves spectral-shape correlation (\npsc{} 0.797 vs.\ 0.77
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig8_gain_curves_resnet.png}
+  \includegraphics[width=\linewidth]{adaptive_gain_S4b_resnet.png}
   \caption{Cross-trunk diagnosis (S4b on ResNet, seed 0): per-image adaptive gain curves grouped by anatomy. Unlike the targeted RED-CNN reshaping of Fig.~\ref{fig:gain_s4b}, the trunk--head equilibrium settles on broadband attenuation with no high-frequency recovery; anatomy separation and all structural guarantees are preserved.}
   \label{fig:gain_resnet}
 \end{figure}
