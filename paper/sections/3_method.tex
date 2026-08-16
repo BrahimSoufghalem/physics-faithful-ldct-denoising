@@ -1,0 +1,57 @@
+% ------------------------------------------------------------
+% Section 3 -- Method
+% ------------------------------------------------------------
+\section{Method}
+\label{sec:method}
+
+% Fig. 1 -- architecture schematic (TikZ, spans both columns)
+\begin{figure*}[t]
+  \centering
+  \input{figures/fig1_architecture}
+  \caption{Overview of the proposed physics-faithful framework. A frozen-interface spectral head $H$ reshapes the removed-noise residual $\hat{n} = x - B(x)$ in the Fourier domain via a learnable radial gain curve $G(|f|)$ (32 knots; DC gain fixed at 1; two near-DC knots frozen at $G{=}1$). A lightweight conditioning encoder ($\approx$5.3k parameters) produces per-image, $\tanh$-bounded log-gain offsets $\Delta_i$, kept anatomy-discriminative by a batch-centering penalty. Training combines MSE with a radial log-NPS loss and a per-tissue HU-bin bias loss.}
+  \label{fig:architecture}
+\end{figure*}
+
+\subsection{Trunk-agnostic residual interface}
+\label{sec:interface}
+
+Let $x$ be the LDCT input and $B$ any denoising trunk. We define the removed noise $\hat{n} = x - B(x)$ and produce the final output $\hat{x} = x - H(\hat{n};\, x)$, where $H$ is the spectral head. Because the interface requires only the pair $(x, B(x))$, the head attaches to any denoiser --- CNN, GAN generator, or transformer --- without modifying the trunk. All main results use a benchmark-faithful RED-CNN trunk as the representative testbed (Sec.~\ref{sec:related}).
+
+\subsection{The DC-preserving radial spectral head}
+\label{sec:head}
+
+$H$ multiplies the 2-D Fourier transform of $\hat{n}$ by a learnable radial gain curve $G(|f|)$, parameterized by 32 log-gain knots interpolated over radial frequency bins. Four structural guarantees hold per image, by construction rather than by training:
+
+\begin{enumerate}
+  \item \textbf{Exact DC preservation.} The gain applies to non-zero frequencies only; the spatial mean (global HU level) of the residual is untouched. Provable, not learned.
+  \item \textbf{Near-DC freezing.} The first two knots are pinned at $G = 1$, protecting large-area regional HU means. This constraint was introduced after diagnosing a $-7$\hu{} regional chest soft-tissue bias and faint concentric rings caused by a sharp gain step adjacent to DC (chest soft-tissue bias $-7.0 \rightarrow -3.5$\hu{} after freezing).
+  \item \textbf{Radial parameterization.} The curve is 32 scalars --- isotropic, interpretable, directly plottable; the head cannot hallucinate anatomical structure.
+  \item \textbf{Bounded adaptivity.} Per-image offsets pass through $\tanh$ with $|\Delta \log G| \le 0.25$; frozen bins receive zero offset.
+\end{enumerate}
+
+Parameter cost: 32 scalars (static) plus a ${\approx}5.3$k-parameter conditioning encoder (adaptive) --- $\le 10^{-3}$ of trunk parameters --- and one FFT pair per image at inference.
+
+\subsection{Anatomy-adaptive conditioning}
+\label{sec:conditioning}
+
+A lightweight encoder (three strided convolutions $\rightarrow$ global average pooling $\rightarrow$ zero-initialized linear projection) maps the input image to per-bin log-gain offsets $\Delta_i$, yielding a per-image curve $G_i(|f|) = \exp(\log G_{\mathrm{shared}} + \Delta_i)$. Zero-initialization guarantees exact equivalence to the static head at initialization.
+
+\subsection{A diagnosed failure mode and the centering constraint}
+\label{sec:centering}
+
+Trained naively, the adaptive offsets saturate at $-\Delta_{\max}$ for all images and all frequency bands: the adaptive path degenerates into a static global gain shift, which the trunk absorbs by denoising more aggressively --- image metrics improve (the selection metric is SSIM) while physics regresses (Sec.~\ref{sec:ablation}, config S4). Two general lessons follow: adaptive capacity serves the dominant training signal unless explicitly constrained, and any static spectral correction is trunk-absorbable under joint training --- only the between-image component of an adaptive correction is architecturally irreducible. We therefore add a quadratic \textbf{batch-centering penalty} $L_{\mathrm{center}}$ (weight 0.05) pulling the batch-mean adaptive offset to zero per frequency bin. Centering assigns the static component to the shared curve, reserves the adaptive path for between-image differences, and keeps $\tanh$ out of its zero-gradient region. With it, offsets remain unsaturated and become anatomy-discriminative (Sec.~\ref{sec:adaptivity}).
+
+\subsection{Training objective}
+\label{sec:objective}
+
+\begin{equation}
+L = L_{\mathrm{MSE}} + \wnps \cdot L_{\mathrm{NPS}} + \whu \cdot L_{\mathrm{HUbin}} + w_c \cdot L_{\mathrm{center}}.
+\end{equation}
+
+\paragraph{Radial NPS loss.}
+$L_{\mathrm{NPS}}$ matches the radially averaged log noise-power spectrum of the removed noise $x - \hat{x}$ to that of the real noise $\mathrm{LDCT} - \mathrm{NDCT}$, penalizing both over-removal and the characteristic low-frequency under-removal hole left by appearance-trained trunks.
+
+\paragraph{HU-bin bias loss.}
+$L_{\mathrm{HUbin}}$ penalizes the mean signed error within fixed physical HU bins with boundaries $(-1024, -500, -200, 200, 600, 1900)$\hu{} --- air/lung, fat/low-density, soft tissue, dense tissue, bone --- directly targeting per-tissue calibration.
+
+Pilot screening (17 configurations) established that $L_{\mathrm{NPS}}$ must always be paired with $L_{\mathrm{HUbin}}$ (alone, it redistributes HU error into soft tissue, bias ${\approx} -4$\hu{}) and that the useful region is $\wnps \in [0.005, 0.01]$; heavier weights ($\ge 0.03$) fail doubly (NPS worsens again, noise-magnitude ratio exceeds 1.1).
