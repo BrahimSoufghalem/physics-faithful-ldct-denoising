@@ -1,0 +1,57 @@
+% ------------------------------------------------------------
+% Section 4 -- Experimental Setup
+% ------------------------------------------------------------
+\section{Experimental Setup}
+\label{sec:setup}
+
+\subsection{Data}
+\label{sec:data}
+
+Mayo Clinic Low Dose CT dataset (AAPM Low Dose CT Grand Challenge;~\cite{mccollough2017}), accessed and split via the ldct-benchmark tooling~\cite{eulig2024} to guarantee protocol comparability (100p split). Held-out test set of 10 patients, balanced by anatomy: chest C121, C135, C170, C249, C280; abdomen L006, L107, L220, L221, L241. Pilot screening used a disjoint 8/4 train/validation patient subset, with all screening physics metrics computed on validation patients only --- no test leakage. Preprocessing follows the benchmark preset: HU window $-1024$ to $1900$, standardization mean $481.4542$ / std $502.1851$ (offset 1024), $128 \times 128$ training patches, batch size 73. NPS estimation uses central $320 \times 320$ crops. The real-noise reference is the residual $\mathrm{LDCT} - \mathrm{NDCT}$.
+
+\subsection{Matched-budget protocol}
+\label{sec:protocol}
+
+Every configuration is trained with an identical budget of 30{,}000 iterations (validation every 1{,}000; learning rate $9.5834 \times 10^{-5}$, constant; model selection by benchmark SSIM on validation). The three decisive arms --- C0, C1h-w0.01, and S4b --- are each trained with three random seeds (0, 1, 2); all other ablation arms use seed 0. A cross-trunk replication additionally trains the same three arms on a ResNet trunk~\cite{he2016} from the same benchmark suite (seed 0), with identical protocol, budget, and loss weights and no re-tuning. We train for 30k iterations because validation metrics plateau well before that point and the residual improvement beyond it is small relative to its compute cost; identical budgets also keep every comparison attribution-clean --- an under-trained model removes less noise and spuriously ``wins'' NPS metrics, so cross-budget comparisons are disallowed by protocol. Loss weights were calibrated in a screening phase (8/4 patients, 8k iterations); only rankings, never values, transfer from screening.
+
+\subsection{Configurations}
+\label{sec:configs}
+
+Table~\ref{tab:configs} lists all configurations; all are trained under the identical protocol above.
+
+\begin{table}[t]
+\centering
+\caption{Configurations.}
+\label{tab:configs}
+\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lllll}
+\toprule
+ID & Head & $\wnps$ & $\whu$ & Role \\
+\midrule
+C0 & --- & 0 & 0 & Baseline (MSE only) \\
+C2 & --- & 0 & 0.2 & HU-bin loss only \\
+C1h & --- & 0.005 & 0.2 & Best loss-only recipe \\
+C1h-w0.01 & --- & 0.01 & 0.2 & \textbf{Matched-weight control} \\
+S1 & static & 0 & 0 & Head w/o incentive (neutrality) \\
+S3b & static, frz-DC 2 & 0.005 & 0.2 & Static head \\
+S4 & adaptive, frz-DC 2 & 0.005 & 0.2 & Diagnostic (saturation failure) \\
+\textbf{S4b} & adapt.\ + cent.\ 0.05, frz-DC 2 & 0.01 & 0.2 & \textbf{Proposed} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Metrics}
+\label{sec:metrics}
+
+Image quality: PSNR, SSIM, VIF, RMSE\textsubscript{HU}. Physical fidelity (removed noise $= x - \hat{x}$, real noise $= \mathrm{LDCT} - \mathrm{NDCT}$, central $320 \times 320$ crops):
+
+\begin{enumerate}
+  \item \textbf{\npsl{} ($\downarrow$)} --- $L_1$ distance between radially averaged log noise-power spectra of removed vs.\ real noise; the primary spectral-fidelity metric.
+  \item \textbf{\npsc{} ($\uparrow$)} --- Pearson correlation of the radial NPS curves; spectral shape fidelity independent of magnitude.
+  \item \textbf{\stdr{} ($\rightarrow 1$)} --- std of removed noise / std of real noise; below 1 means residual noise left in the image, above 1 means anatomy erased as ``noise''.
+  \item \textbf{Per-tissue HU bias ($\rightarrow 0$\hu{})} --- mean signed error within the fixed HU bins of Sec.~\ref{sec:objective}; directly clinically interpretable.
+\end{enumerate}
+
+\paragraph{Reporting rule --- always per anatomy.}
+Overall aggregates can cancel: C2's overall bone bias of $-2.0$\hu{} hides chest $-18.3$ / abdomen $+14.3$\hu{}. All tables report chest and abdomen separately; overall values are shown for convenience only. Statistical testing: paired per-patient Wilcoxon signed-rank tests ($n = 10$, two-sided; a 10/10 sweep yields the exact minimum $p = 0.002$).
