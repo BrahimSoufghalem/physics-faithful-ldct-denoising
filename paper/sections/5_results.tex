@@ -9,7 +9,7 @@
 
 Our C0 reproduction is consistent with the published benchmark RED-CNN given the deliberately reduced budget (chest SSIM ${\approx} 0.58$ vs.\ 0.609 published at $3\times$ budget; abdomen 0.910 vs.\ 0.903)~\cite{eulig2024}. Classically, C0 is the strongest configuration in the study --- yet physically it is broken in exactly the ways Sec.~\ref{sec:intro} predicts for appearance-only training: 16\% of the noise magnitude is left unremoved overall (26\% in the abdomen); the abdominal NPS shows a ${\sim}7\times$ low-frequency under-removal hole (directly visible in Fig.~\ref{fig:nps_abd}) and a spectral-shape correlation of only 0.51; and calibration errors invisible to PSNR/SSIM appear in every dense tissue class --- chest bone $-53.2$\hu{}, chest fat/low-density $+73.1$\hu{}, dense tissue $-28.7$\hu{} overall (Table~\ref{tab:baseline}).
 
-\begin{table}[t]
+\begin{table}[!tbp]
 \centering
 \caption{Baseline C0 @30k, test set (seed 0).}
 \label{tab:baseline}
@@ -34,7 +34,7 @@ Bias\textsubscript{Bone} (HU) & $-53.25$ & $-6.08$ & $-29.66$ \\
 \subsection{Cumulative component ablation}
 \label{sec:ablation}
 
-\begin{table*}[t]
+\begin{table*}[!tp]
 \centering
 \caption{Cumulative ablation (overall; 30k, test set, seed 0). $\dagger$ C2's overall bone bias is misleading (chest $-18.3$ / abdomen $+14.3$ cancel) --- see the per-anatomy reporting rule (Sec.~\ref{sec:metrics}).}
 \label{tab:ablation}
@@ -60,12 +60,12 @@ Table~\ref{tab:ablation}: each component addresses its predecessor's side effect
 
 The decisive comparison holds losses identical ($\wnps = 0.01$, $\whu = 0.2$) and differs only in the head (Table~\ref{tab:attribution}).
 
-\begin{table}[t]
+\begin{table}[!tbp]
 \centering
 \caption{Matched-weight attribution control (mean $\pm$ std over seeds 0/1/2; SSIM/VIF from seed 0).}
 \label{tab:attribution}
-\small
 \setlength{\tabcolsep}{3pt}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{lccc}
 \toprule
  & C1h-w0.01 (no head) & \textbf{S4b (head)} & $\Delta$ \\
@@ -81,21 +81,21 @@ PSNR & $30.465 \pm 0.056$ & $\mathbf{30.509 \pm 0.019}$ & $+0.04$ dB \\
 SSIM (seed 0) & 0.7320 & 0.7303 & $-0.002$ \\
 VIF (seed 0) & 0.2989 & 0.2988 & $=$ \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 At equal incentives the head wins the primary spectral metric on \textbf{all 10 test patients in every one of the three seeds} (30/30; two-sided per-seed Wilcoxon signed-rank $p = 0.002$), together with \stdr{} (3/3 seeds), chest bone bias (3/3), and \npsc{} (2/3) --- coherently across both anatomies, at equal-or-better classical quality. The architectural contribution is real, reproducible across seeds, and not attributable to loss weights.
 
 Figures~\ref{fig:nps_chest} and~\ref{fig:nps_abd} make the mechanism visible. In the chest (Fig.~\ref{fig:nps_chest}), the head closes the low-frequency under-removal dip almost completely: the removed-noise NPS of RED-CNN+Spectral is nearly indistinguishable from the reference-noise curve across the spectrum, consistent with chest \npsl{} dropping below 0.1. In the abdomen (Fig.~\ref{fig:nps_abd}), where the baseline's low-frequency hole is most severe (${\sim}7\times$ at 0.05--0.1 cycles/pixel), the head recovers most of the missing low-frequency noise power; a residual low--mid-frequency gap remains --- consistent with the abdominal \stdr{} of ${\approx}0.89$ --- together with a slight overshoot above 0.6 cycles/pixel.
 
-\begin{figure}[t]
+\begin{figure}[!tbp]
   \centering
   \includegraphics[width=\linewidth]{nps_C121.png}
   \caption{Chest (C121): radial NPS of removed vs.\ reference noise. The baseline under-removes low-frequency noise (dip at ${\approx}0.05$ cycles/pixel); with the spectral head, the removed-noise NPS is nearly indistinguishable from the reference across the spectrum.}
   \label{fig:nps_chest}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[!tbp]
   \centering
   \includegraphics[width=\linewidth]{nps_L006.png}
   \caption{Abdomen (L006): radial NPS of removed vs.\ reference noise. The baseline's ${\sim}7\times$ low-frequency hole is largely closed by the head; a residual low--mid-frequency gap and a slight overshoot above 0.6 cycles/pixel remain.}
@@ -107,12 +107,12 @@ Figures~\ref{fig:nps_chest} and~\ref{fig:nps_abd} make the mechanism visible. In
 
 Without the head, doubling $\wnps$ from 0.005 to 0.01 makes everything worse (Table~\ref{tab:ceiling}). With the head, the same $\wnps = 0.01$ yields the best physics in the study (Table~\ref{tab:attribution}). The gradient signal exists, but the trunk has no mechanism to express targeted spectral corrections; the head provides exactly those degrees of freedom.
 
-\begin{table}[t]
+\begin{table}[!tbp]
 \centering
 \caption{The loss ceiling (loss-only configurations).}
 \label{tab:ceiling}
-\small
 \setlength{\tabcolsep}{3pt}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{lrrrrr}
 \toprule
 Loss-only config & PSNR & \npsl{} $\downarrow$ & \stdr{} & Bias\textsubscript{Soft} & Bias\textsubscript{Bone} \\
@@ -120,13 +120,13 @@ Loss-only config & PSNR & \npsl{} $\downarrow$ & \stdr{} & Bias\textsubscript{So
 C1h ($w{=}0.005$) & 30.57 & 0.2669 & 0.9258 & $-0.45$ & $-7.56$ \\
 C1h ($w{=}0.01$) & 30.40 & 0.2869 & 0.9180 & $-4.61$ & $-15.61$ \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 \subsection{Per-anatomy physical fidelity}
 \label{sec:peranat}
 
-\begin{table*}[t]
+\begin{table*}[!tp]
 \centering
 \caption{Full physics table (chest C / abdomen A; 30k, test set, seed 0).}
 \label{tab:physics}
@@ -150,14 +150,14 @@ S4b brings chest \npsl{} below 0.1 for the first time in the study, with chest \
 
 Qualitative panels (Figs.~\ref{fig:qual_chest}--\ref{fig:qual_abd}) confirm that the physics gains cost nothing visible. ROI mean HU values of both denoisers sit within a few HU of the NDCT reference in soft-tissue and lung ROIs, and the head brings ROI noise magnitude slightly closer to the reference (kidney ROI std 86.6 vs.\ 85.9\hu{}, NDCT 87.3). The difference maps are more diagnostic than the images themselves: the baseline's residual is a broad, spatially unstructured speckle --- the unremoved low-frequency noise of Figs.~\ref{fig:nps_chest}--\ref{fig:nps_abd} seen in image space --- whereas the head's residual is visibly reduced in homogeneous regions and concentrates at anatomical edges, exactly what a radial spectral correction of the residual can and cannot fix.
 
-\begin{figure*}[t]
+\begin{figure*}[!tp]
   \centering
   \includegraphics[width=\textwidth]{compare_C121_s196.png}
   \caption{Chest qualitative panel (C121, slice 196; window $c{=}{-}600$/$w{=}1500$): LDCT / RED-CNN / RED-CNN+Spectral / NDCT with $\pm 100$\hu{} difference maps and ROI crops. ROI means sit within a few HU of NDCT for both denoisers; the head's difference map shows reduced unstructured residual.}
   \label{fig:qual_chest}
 \end{figure*}
 
-\begin{figure*}[t]
+\begin{figure*}[!tp]
   \centering
   \includegraphics[width=\textwidth]{compare_L006_s107.png}
   \caption{Abdomen qualitative panel (L006, slice 107; window $c{=}50$/$w{=}400$): same layout, $\pm 50$\hu{} difference maps. Soft-tissue ROI means match NDCT within ${\approx}1$\hu{}; the head's residual concentrates at anatomical edges rather than broad speckle.}
@@ -169,14 +169,14 @@ Qualitative panels (Figs.~\ref{fig:qual_chest}--\ref{fig:qual_abd}) confirm that
 
 The learned gain curves are directly plottable. The shared curve returns noise mostly at the lowest frequencies (fixing the low-frequency hole) and at the highest frequencies (noise grain), trusting the trunk in between; $G = 1$ at the two frozen near-DC knots for every image, by construction. Grouping per-image curves by anatomy (20 slices per test patient; $n = 100$ per anatomy) shows chest curves consistently above abdomen curves with a mean separation of 0.0101 at $r \approx 0.09$ Nyquist --- ${\approx}4.2\times$ the within-anatomy spread of 0.0024 (Fig.~\ref{fig:gain_s4b}). The naive-adaptive diagnostic (Fig.~\ref{fig:gain_s4}) shows the same plot for S4: all per-image curves collapsed a factor $\exp(-0.25)$ below the shared curve --- the degeneration that motivates the centering penalty. To our knowledge this is the first LDCT module whose anatomy-adaptivity is itself measured rather than asserted.
 
-\begin{figure}[t]
+\begin{figure}[!tbp]
   \centering
   \includegraphics[width=\linewidth]{adaptive_gain_S4b.png}
   \caption{Proposed (S4b): per-image adaptive gain curves grouped by anatomy ($n = 100$ per anatomy; 30k matched budget, test set, seed 0). Chest curves lie consistently above abdomen curves; $G = 1$ at the two frozen near-DC knots for every image.}
   \label{fig:gain_s4b}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[!tbp]
   \centering
   \includegraphics[width=\linewidth]{adaptive_gain_S4.png}
   \caption{Saturation diagnostic (S4, naive adaptive): all per-image curves collapse a factor $\exp(-0.25)$ below the shared curve --- the degeneration that motivates the batch-centering penalty (same protocol as Fig.~\ref{fig:gain_s4b}).}
@@ -204,7 +204,7 @@ With no re-tuning, the loss recipe moves \npsl{} from 0.459 to 0.278 ($-39\%$) a
 \paragraph{(c) The head's benefit is trunk-dependent.}
 On ResNet, the head improves spectral-shape correlation (\npsc{} 0.797 vs.\ 0.775), chest bone bias ($-31.5$ vs.\ $-36.2$\hu{}), and PSNR (30.44 vs.\ 30.32), but concedes the radial-NPS fit (\npsl{} 0.308 vs.\ 0.278; the loss-only control wins on 10/10 patients, $p = 0.002$) and \stdr{} (0.918 vs.\ 0.943), and introduces a $+4.8$\hu{} chest air/lung bias absent elsewhere. The learned gain curve diagnoses the mechanism: on RED-CNN the head learns a targeted reshaping (a dip at 0.14--0.18 Nyquist with recovery to ${\approx}0.99$ at high frequencies), whereas on ResNet the trunk--head equilibrium settles on broadband attenuation ($G \approx 0.90$--$0.96$ across the entire spectrum, minimum 0.896, no high-frequency recovery) that over-suppresses the removed noise. The head's hyperparameters (centering weight, frozen-bin count) were tuned on RED-CNN and applied unchanged; per-trunk constraint tuning is future work (Sec.~\ref{sec:limitations}). Fig.~\ref{fig:gain_resnet} shows the signature directly: the ResNet head's per-image gain curves are depressed across the entire spectrum ($G \approx 0.90$--$0.96$, minimum ${\approx}0.896$ near Nyquist$\cdot\sqrt{2}$) with no high-frequency recovery --- while chest/abdomen separation and every structural guarantee, including the frozen near-DC knots at $G = 1$, are preserved.
 
-\begin{figure}[t]
+\begin{figure}[!tbp]
   \centering
   \includegraphics[width=\linewidth]{adaptive_gain_S4b_resnet.png}
   \caption{Cross-trunk diagnosis (S4b on ResNet, seed 0): per-image adaptive gain curves grouped by anatomy. Unlike the targeted RED-CNN reshaping of Fig.~\ref{fig:gain_s4b}, the trunk--head equilibrium settles on broadband attenuation with no high-frequency recovery; anatomy separation and all structural guarantees are preserved.}
