@@ -1,0 +1,55 @@
+% ------------------------------------------------------------
+% Fig. 1 -- Architecture schematic (TikZ)
+% Input from sections/3_method.tex inside a figure* environment.
+% ------------------------------------------------------------
+\begin{tikzpicture}[
+  font=\small,
+  node distance=7mm and 9mm,
+  box/.style={draw, rounded corners=2pt, align=center, minimum height=8.5mm, inner sep=4pt},
+  trunk/.style={box, fill=blue!8},
+  head/.style={box, fill=orange!12},
+  loss/.style={box, fill=green!10, dashed},
+  op/.style={draw, circle, inner sep=1.5pt},
+  arr/.style={-{Stealth[length=2.2mm]}, thick},
+  lbl/.style={font=\scriptsize, align=center}
+]
+
+% ---------- top row: trunk path ----------
+\node[box] (x) {LDCT input\\$x$};
+\node[trunk, right=of x] (B) {Denoising trunk $B$\\(RED-CNN / ResNet / any)\\ \scriptsize frozen interface: trunk unmodified};
+\node[op, right=of B] (minus1) {$-$};
+\node[box, right=of minus1] (nhat) {Removed noise\\$\hat{n} = x - B(x)$};
+
+\draw[arr] (x) -- (B);
+\draw[arr] (B) -- (minus1);
+\draw[arr] (x.north) .. controls +(0,10mm) and +(0,10mm) .. (minus1.north)
+  node[pos=0.5, lbl, above] {$x$};
+\draw[arr] (minus1) -- (nhat);
+
+% ---------- spectral head ----------
+\node[head, below=11mm of nhat] (fft) {2-D FFT};
+\node[head, left=of fft] (gain) {Radial gain $G_i(|f|)$\\ \scriptsize 32 log-gain knots \\ \scriptsize DC gain $=1$ (exact) \\ \scriptsize 2 near-DC knots frozen at $G{=}1$};
+\node[head, left=of gain] (ifft) {inverse FFT};
+
+\draw[arr] (nhat) -- (fft);
+\draw[arr] (fft) -- (gain) node[pos=0.5, lbl, above] {$\times$};
+\draw[arr] (gain) -- (ifft);
+
+% ---------- conditioning encoder ----------
+\node[head, below=10mm of gain] (enc) {Conditioning encoder ($\approx$5.3k params)\\ \scriptsize 3 strided convs $\to$ GAP $\to$ zero-init linear \\ \scriptsize $\Delta_i = \Delta_{\max}\tanh(\cdot)$, $|\Delta \log G| \le 0.25$};
+\draw[arr] (enc) -- (gain) node[pos=0.5, lbl, right] {$\log G_i = \log G_{\mathrm{shared}} + \Delta_i$};
+\draw[arr] (x.south) .. controls +(0,-24mm) and +(-14mm,0) .. (enc.west)
+  node[pos=0.75, lbl, below] {$x$};
+
+% ---------- output ----------
+\node[op, left=13mm of ifft] (minus2) {$-$};
+\node[box, left=of minus2, fill=gray!8] (xhat) {Output\\$\hat{x} = x - H(\hat{n};x)$};
+\draw[arr] (ifft) -- (minus2) node[pos=0.5, lbl, above] {$H(\hat{n};x)$};
+\draw[arr] (x.west) .. controls +(-8mm,0) and +(0,14mm) .. (minus2.north)
+  node[pos=0.3, lbl, left] {$x$};
+\draw[arr] (minus2) -- (xhat);
+
+% ---------- losses ----------
+\node[loss, below=10mm of enc, xshift=-12mm] (losses) {Training objective:\quad $L = L_{\mathrm{MSE}} + w_{\mathrm{nps}} L_{\mathrm{NPS}} + w_{\mathrm{hu}} L_{\mathrm{HUbin}} + w_c L_{\mathrm{center}}$\\[1pt] \scriptsize $L_{\mathrm{NPS}}$: radial log-NPS of $x-\hat{x}$ vs.\ real noise \quad $L_{\mathrm{HUbin}}$: per-tissue signed HU bias \quad $L_{\mathrm{center}}$: batch-centering of $\Delta_i$ (anti-degeneration)};
+
+\end{tikzpicture}
