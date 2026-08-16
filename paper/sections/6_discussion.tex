@@ -1,0 +1,51 @@
+% ------------------------------------------------------------
+% Section 6 -- Discussion and Limitations
+% ------------------------------------------------------------
+\section{Discussion and Limitations}
+\label{sec:discussion}
+
+\subsection{What the evidence supports}
+\label{sec:claims}
+
+\paragraph{Claim 1 --- the architectural contribution is real, isolable, and reproducible.}
+At strictly matched budgets and loss weights, adding only the head improves the physics metrics coherently across both anatomies at equal classical quality (Table~\ref{tab:attribution}), winning the primary spectral metric on all 30 patient--seed comparisons (10/10 patients in each of three seeds, $p = 0.002$ per seed). On the RED-CNN testbed this claim is multi-seed; its cross-trunk scope is bounded explicitly in Sec.~\ref{sec:crosstrunk}.
+
+\paragraph{Claim 2 --- losses alone hit a ceiling; the head raises it.}
+The loss-only recipe peaks at $\wnps = 0.005$; doubling the incentive without the head degrades physics and image quality, while the same doubled incentive with the head yields the study's best physics (Sec.~\ref{sec:ceiling}). The trunk lacks a mechanism to express targeted spectral corrections; the head provides those degrees of freedom, decoupled from anatomy reconstruction.
+
+\paragraph{Claim 3 --- guaranteed, measurable anatomy-adaptivity.}
+The adaptive head learns chest/abdomen-distinct gain curves (separation ${\approx}4\times$ within-anatomy spread) while every image retains exact DC preservation and frozen near-DC gains (Sec.~\ref{sec:adaptivity}).
+
+\paragraph{Claim 4 --- the physics constraints restore determinism, not just fidelity.}
+With appearance-only training, seeds that are classically indistinguishable (PSNR std 0.04 dB, SSIM std 0.0004) differ by $\pm 13\%$ in spectral fidelity: the physics of the solution is under-determined by the objective. The constrained configurations reduce this seed variance $2.5$--$4\times$ (Sec.~\ref{sec:seeds}), making physical fidelity a property of the method rather than an accident of initialization.
+
+\subsection{Methodological lessons}
+\label{sec:lessons}
+
+\begin{enumerate}
+  \item \textbf{Adaptive capacity chases the dominant training signal.} Naively trained, the adaptive path collapsed into a static shift serving the SSIM selection metric --- image metrics improved while physics regressed. Constraint design, not capacity, is what redirects adaptivity toward physics.
+  \item \textbf{Static spectral corrections are trunk-absorbable.} Any global gain shift can be undone by the trunk during joint training; only the between-image component of an adaptive correction is architecturally irreducible.
+  \item \textbf{Evaluation hygiene matters as much as modeling.} Matched budgets (under-trained models fake good NPS), per-anatomy reporting (aggregates cancel), and selection-metric awareness (SSIM selection actively pulls against physics) were each necessary to draw valid conclusions.
+  \item \textbf{The interface is trunk-agnostic; the learned equilibrium is not.} The head attaches to any trunk, and its structural guarantees hold on every trunk and every seed by construction --- but its measured value depends on how trunk and head divide the spectral-shaping labor during joint training (Sec.~\ref{sec:crosstrunk}). In earlier preliminary experiments with other trunk architectures we observed qualitatively similar head benefits (those runs could not be completed under the full evaluation protocol due to compute constraints and are not reported), whereas on the residual ResNet trunk, measured in full, the head concedes the radial-NPS fit. We report this reversal as a finding: it cautions against assuming ``plug-and-play'' physics modules generalize across trunks without per-trunk measurement --- and it is diagnosable at all only because the head's gain curve is directly interpretable.
+\end{enumerate}
+
+\subsection{Limitations}
+\label{sec:limitations}
+
+\begin{enumerate}
+  \item \textbf{Three seeds for the decisive arms; one seed elsewhere.} The C0 / control / S4b comparison is multi-seed (Sec.~\ref{sec:seeds}), but the remaining ablation arms and the ResNet replication use seed 0 only. Bias metrics remain the noisiest axis across seeds (control chest soft-tissue bias spans $-0.9$ to $-7.5$\hu{}), so coherence across metrics and anatomies remains our evidence standard for bias claims.
+  \item \textbf{Abdomen bone-bias sign flip} (${\approx}{-}6 \rightarrow {\approx}{+}11$\ldots${+}15$\hu{}) in every HU-bin-loss configuration --- systematic to the loss, not the head; per-bin weights are a candidate mitigation, untested at full budget.
+  \item \textbf{Dense-tissue bias (${\approx}{-}18$\hu{}) unresolved} by any configuration.
+  \item \textbf{Chest bone bias remains large} (${\approx}{-}29$\hu{} for S4b vs.\ ${\approx}{-}42$ for the control) --- halved, not solved.
+  \item \textbf{30k training budget} (vs.\ 92{,}994 full protocol) --- chosen for the plateau and attribution reasons of Sec.~\ref{sec:protocol}; a full-budget confirmation of the winning configuration is simple future work.
+  \item \textbf{Abdominal \npsc{} trade-off}: spectral magnitude fidelity partially trades against shape correlation (0.67 vs.\ C0's 0.51 improved, but not uniformly across rounds).
+  \item \textbf{Small cohort}: 10 test patients, single dataset, single dose level --- external generalization untested.
+  \item \textbf{Possible faint concentric-ring artifacts} in difference maps (spectral binning); mitigated by near-DC freezing; monitored in the final figure pass.
+  \item \textbf{No reader study or task-based assessment} --- physics metrics are reproducible surrogates, not observer performance.
+  \item \textbf{Head benefit is trunk-dependent.} The ResNet replication (Sec.~\ref{sec:crosstrunk}) shows the losses transfer fully, but the head --- with hyperparameters tuned on RED-CNN and applied unchanged --- concedes the radial-NPS fit on the residual trunk. Per-trunk tuning of the head's constraints (e.g.\ stronger high-frequency gain regularization or high-band freezing) is untested; earlier preliminary runs on other trunk architectures suggested qualitatively similar head benefits but could not be completed under the full protocol due to compute constraints and are therefore not reported.
+\end{enumerate}
+
+\subsection{Positioning}
+\label{sec:positioning}
+
+Against the benchmark finding of six years of marginal classical gains~\cite{eulig2024}, this work does not claim a better denoiser on PSNR/SSIM. It claims a near-free, provable, interpretable physics layer --- loss components that transfer across trunks unchanged, and a head whose structural guarantees hold on any trunk while its quantitative benefit must be measured per trunk --- and argues, on clinical grounds (Sec.~\ref{sec:intro}), that physical fidelity is the more consequential axis on which to compete.
