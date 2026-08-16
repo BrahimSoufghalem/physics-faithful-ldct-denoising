@@ -1,0 +1,17 @@
+% ------------------------------------------------------------
+% Section 2 -- Related Work
+% ------------------------------------------------------------
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Deep LDCT denoising and its stagnation.}
+RED-CNN~\cite{chen2017} remains a canonical encoder--decoder baseline for supervised LDCT denoising; adversarial approaches such as WGAN-VGG~\cite{yang2018} and DU-GAN~\cite{huang2022} trade pixel-wise fidelity for perceptual texture. The ldct-benchmark study~\cite{eulig2024} standardizes training and evaluation across this line of work and finds that, on PSNR/SSIM/VIF, ``most methods perform statistically similar and improvements over the past six years have been marginal at best.'' We adopt their exact protocol and reframe the target axis: physical fidelity rather than classical metrics. Importantly, the failure we audit is not a property of RED-CNN specifically --- it follows from the appearance-driven objectives shared by this entire family of methods; RED-CNN serves only as the standardized, representative testbed.
+
+\paragraph{Physics-aware objectives.}
+Noise-power-spectrum losses have appeared recently --- most directly CT-Mamba~\cite{li2025}, which introduces a Mamba-driven deep NPS loss, and the frequency-domain NPS loss of Zhang et al.~\cite{zhang2025}; noise-texture preservation is likewise reported as a headline property of recent dose-aware diffusion work. These are pure loss-level interventions on the trunk: none provide structural guarantees (exact DC/HU preservation), and none study the interaction between physics-loss weight and architectural capacity. We show empirically that loss-only physics incentives hit a weight ceiling (Sec.~\ref{sec:ceiling}) and that an architectural mechanism is required to exploit stronger incentives.
+
+\paragraph{Frequency-adaptive restoration in natural images.}
+Adaptive frequency modulation (AdaIR~\cite{cui2025} and related all-in-one restoration work) and FiLM-style conditioning~\cite{perez2018} modulate features per input, but they target natural images, operate on unconstrained feature maps, and offer no physical guarantees.
+
+\paragraph{Gap we fill.}
+To our knowledge, no prior LDCT work combines (i) a trunk-agnostic residual spectral head acting on the removed-noise residual; (ii) provable per-image guarantees (exact DC preservation, frozen near-DC gains, radial parameterization, bounded adaptive offsets); (iii) anatomy-adaptive per-image gain curves whose adaptivity is itself quantitatively measured; and (iv) an attribution protocol (matched budgets, matched loss weights, loss-ceiling control) that isolates the architectural contribution from the loss contribution.
