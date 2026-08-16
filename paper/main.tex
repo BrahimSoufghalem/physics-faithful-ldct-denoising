@@ -21,6 +21,20 @@
 
 \graphicspath{{figures/}}
 
+% ---- float placement tuning ----
+% Prevents LaTeX from deferring figures/tables to the end of the document:
+% relax the (strict) default fractions and allow more floats per page.
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.7}
+\renewcommand{\dbltopfraction}{0.95}
+\renewcommand{\dblfloatpagefraction}{0.7}
+\setcounter{topnumber}{4}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{8}
+\setcounter{dbltopnumber}{3}
+
 % ---- shorthand macros ----
 \newcommand{\npsl}{NPS\textsubscript{LogL1}}
 \newcommand{\npsc}{NPS\textsubscript{Corr}}
