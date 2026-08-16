@@ -19,12 +19,12 @@ Every configuration is trained with an identical budget of 30{,}000 iterations (
 
 Table~\ref{tab:configs} lists all configurations; all are trained under the identical protocol above.
 
-\begin{table}[t]
+\begin{table}[!tbp]
 \centering
-\caption{Configurations.}
+\caption{Configurations. ``frz-DC 2'' = two near-DC knots frozen at $G{=}1$; ``cent.'' = batch-centering penalty (weight 0.05).}
 \label{tab:configs}
-\small
 \setlength{\tabcolsep}{3pt}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{lllll}
 \toprule
 ID & Head & $\wnps$ & $\whu$ & Role \\
@@ -33,12 +33,12 @@ C0 & --- & 0 & 0 & Baseline (MSE only) \\
 C2 & --- & 0 & 0.2 & HU-bin loss only \\
 C1h & --- & 0.005 & 0.2 & Best loss-only recipe \\
 C1h-w0.01 & --- & 0.01 & 0.2 & \textbf{Matched-weight control} \\
-S1 & static & 0 & 0 & Head w/o incentive (neutrality) \\
+S1 & static & 0 & 0 & Neutrality check \\
 S3b & static, frz-DC 2 & 0.005 & 0.2 & Static head \\
-S4 & adaptive, frz-DC 2 & 0.005 & 0.2 & Diagnostic (saturation failure) \\
-\textbf{S4b} & adapt.\ + cent.\ 0.05, frz-DC 2 & 0.01 & 0.2 & \textbf{Proposed} \\
+S4 & adaptive, frz-DC 2 & 0.005 & 0.2 & Saturation diagnostic \\
+\textbf{S4b} & adapt.\ + cent., frz-DC 2 & 0.01 & 0.2 & \textbf{Proposed} \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 \subsection{Metrics}
