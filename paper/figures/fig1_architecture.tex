@@ -1,55 +1,71 @@
 % ------------------------------------------------------------
-% Fig. 1 -- Architecture schematic (TikZ)
+% Fig. 1 -- Architecture schematic (TikZ), v2 visual redesign
 % Input from sections/3_method.tex inside a figure* environment.
+% Layout: row 1 = analysis path (x -> B -> residual),
+%         row 2 = spectral head + synthesis (right to left),
+%         row 3 = conditioning encoder; dashed box groups the head H;
+%         outer-left rail carries the identity path x.
 % ------------------------------------------------------------
 \begin{tikzpicture}[
   font=\small,
-  node distance=7mm and 9mm,
-  box/.style={draw, rounded corners=2pt, align=center, minimum height=8.5mm, inner sep=4pt},
-  trunk/.style={box, fill=blue!8},
-  head/.style={box, fill=orange!12},
-  loss/.style={box, fill=green!10, dashed},
-  op/.style={draw, circle, inner sep=1.5pt},
-  arr/.style={-{Stealth[length=2.2mm]}, thick},
-  lbl/.style={font=\scriptsize, align=center}
+  box/.style={draw=black!55, rounded corners=3pt, align=center, minimum height=9mm, inner sep=5pt, fill=white},
+  trunk/.style={box, fill=blue!9, draw=blue!45},
+  headbox/.style={box, fill=orange!14, draw=orange!55},
+  encbox/.style={box, fill=orange!7, draw=orange!45},
+  outbox/.style={box, fill=gray!12, draw=black!55},
+  lossbox/.style={box, dashed, fill=green!7, draw=green!45!black},
+  op/.style={draw=black!70, circle, inner sep=1.1pt, fill=white},
+  arr/.style={-{Stealth[length=2.4mm]}, semithick, draw=black!75},
+  wire/.style={semithick, draw=black!75},
+  lbl/.style={font=\scriptsize, text=black!65, inner sep=1.5pt}
 ]
 
-% ---------- top row: trunk path ----------
-\node[box] (x) {LDCT input\\$x$};
-\node[trunk, right=of x] (B) {Denoising trunk $B$\\(RED-CNN / ResNet / any)\\ \scriptsize frozen interface: trunk unmodified};
-\node[op, right=of B] (minus1) {$-$};
-\node[box, right=of minus1] (nhat) {Removed noise\\$\hat{n} = x - B(x)$};
+% ---------- row 1: analysis path ----------
+\node[box] (x) at (0,0) {LDCT input\\ $x$};
+\node[trunk] (B) at (3.6,0) {Denoising trunk $B$\\ \scriptsize RED-CNN / ResNet / any (unmodified)};
+\node[op] (sub1) at (6.5,0) {$-$};
+\node[box] (nhat) at (8.9,0) {Removed noise\\ $\hat{n} = x - B(x)$};
 
 \draw[arr] (x) -- (B);
-\draw[arr] (B) -- (minus1);
-\draw[arr] (x.north) .. controls +(0,10mm) and +(0,10mm) .. (minus1.north)
-  node[pos=0.5, lbl, above] {$x$};
-\draw[arr] (minus1) -- (nhat);
+\draw[arr] (B) -- (sub1) node[lbl, midway, below] {$B(x)$};
+\draw[arr] (sub1) -- (nhat);
+\draw[arr] (x.north) -- ++(0,0.85) -| (sub1) node[lbl, pos=0.28, above] {$x$};
 
-% ---------- spectral head ----------
-\node[head, below=11mm of nhat] (fft) {2-D FFT};
-\node[head, left=of fft] (gain) {Radial gain $G_i(|f|)$\\ \scriptsize 32 log-gain knots \\ \scriptsize DC gain $=1$ (exact) \\ \scriptsize 2 near-DC knots frozen at $G{=}1$};
-\node[head, left=of gain] (ifft) {inverse FFT};
+% ---------- row 2: spectral head + synthesis (right to left) ----------
+\node[headbox] (fft) at (8.9,-2.7) {2-D\\ FFT};
+\node[headbox] (gain) at (5.9,-2.7) {$\times\; G_i(|f|)$\\ \scriptsize 32 log-gain knots\\ \scriptsize DC $=1$; 2 near-DC frozen};
+\node[headbox] (ifft) at (3.0,-2.7) {inverse\\ FFT};
+\node[op] (sub2) at (1.35,-2.7) {$-$};
+\node[outbox] (xhat) at (-0.85,-2.7) {Output\\ $\hat{x} = x - H(\hat{n};x)$};
 
 \draw[arr] (nhat) -- (fft);
-\draw[arr] (fft) -- (gain) node[pos=0.5, lbl, above] {$\times$};
+\draw[arr] (fft) -- (gain);
 \draw[arr] (gain) -- (ifft);
+\draw[arr] (ifft) -- (sub2) node[lbl, midway, above] {$H(\hat{n};x)$};
+\draw[arr] (sub2) -- (xhat);
 
-% ---------- conditioning encoder ----------
-\node[head, below=10mm of gain] (enc) {Conditioning encoder ($\approx$5.3k params)\\ \scriptsize 3 strided convs $\to$ GAP $\to$ zero-init linear \\ \scriptsize $\Delta_i = \Delta_{\max}\tanh(\cdot)$, $|\Delta \log G| \le 0.25$};
-\draw[arr] (enc) -- (gain) node[pos=0.5, lbl, right] {$\log G_i = \log G_{\mathrm{shared}} + \Delta_i$};
-\draw[arr] (x.south) .. controls +(0,-24mm) and +(-14mm,0) .. (enc.west)
-  node[pos=0.75, lbl, below] {$x$};
+% ---------- row 3: conditioning encoder ----------
+\node[encbox] (enc) at (5.9,-5.2) {Conditioning encoder ($\approx$5.3k params)\\ \scriptsize 3 strided convs $\to$ GAP $\to$ zero-init linear\\ \scriptsize $\Delta_i = \Delta_{\max}\tanh(\cdot)$, $|\Delta \log G| \le 0.25$};
+\draw[arr] (enc) -- (gain) node[lbl, midway, right] {$\log G_i = \log G_{\mathrm{shared}} + \Delta_i$};
 
-% ---------- output ----------
-\node[op, left=13mm of ifft] (minus2) {$-$};
-\node[box, left=of minus2, fill=gray!8] (xhat) {Output\\$\hat{x} = x - H(\hat{n};x)$};
-\draw[arr] (ifft) -- (minus2) node[pos=0.5, lbl, above] {$H(\hat{n};x)$};
-\draw[arr] (x.west) .. controls +(-8mm,0) and +(0,14mm) .. (minus2.north)
-  node[pos=0.3, lbl, left] {$x$};
-\draw[arr] (minus2) -- (xhat);
+% ---------- outer-left identity rail ----------
+\coordinate (rail) at (-2.6,0);
+\draw[wire] (x.west) -- (rail);
+\draw[arr] (rail) -- (-2.6,-1.35) -| (sub2);
+\draw[arr] (rail) |- (enc.west);
+\node[lbl, left] at (-2.6,-1.3) {$x$};
 
-% ---------- losses ----------
-\node[loss, below=10mm of enc, xshift=-12mm] (losses) {Training objective:\quad $L = L_{\mathrm{MSE}} + w_{\mathrm{nps}} L_{\mathrm{NPS}} + w_{\mathrm{hu}} L_{\mathrm{HUbin}} + w_c L_{\mathrm{center}}$\\[1pt] \scriptsize $L_{\mathrm{NPS}}$: radial log-NPS of $x-\hat{x}$ vs.\ real noise \quad $L_{\mathrm{HUbin}}$: per-tissue signed HU bias \quad $L_{\mathrm{center}}$: batch-centering of $\Delta_i$ (anti-degeneration)};
+% ---------- head grouping ----------
+\node[draw=orange!60, dashed, semithick, rounded corners=5pt, inner sep=7pt,
+      fit=(fft)(gain)(ifft)(enc)] (headfit) {};
+\node[font=\scriptsize\bfseries, text=orange!60!black, anchor=north] at (headfit.south)
+  {Spectral head $H$ --- frozen interface $\cdot$ DC-preserving $\cdot$ anatomy-adaptive};
+
+% ---------- training objective ----------
+\node[lossbox] at (3.6,-7.6)
+  {Training objective:\; $L \;=\; L_{\mathrm{MSE}} \;+\; \wnps\, L_{\mathrm{NPS}} \;+\; \whu\, L_{\mathrm{HUbin}} \;+\; w_c\, L_{\mathrm{center}}$\\[1pt]
+   \scriptsize $L_{\mathrm{NPS}}$: radial log-NPS of $x-\hat{x}$ vs.\ real noise \quad
+   $L_{\mathrm{HUbin}}$: per-tissue signed HU bias \quad
+   $L_{\mathrm{center}}$: batch-centering of $\Delta_i$ (anti-degeneration)};
 
 \end{tikzpicture}
