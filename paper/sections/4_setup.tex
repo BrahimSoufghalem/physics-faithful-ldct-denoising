@@ -7,7 +7,7 @@
 \subsection{Data}
 \label{sec:data}
 
-Mayo Clinic Low Dose CT dataset (AAPM Low Dose CT Grand Challenge;~\cite{mccollough2017}), accessed and split via the ldct-benchmark tooling~\cite{eulig2024} to guarantee protocol comparability (100p split). Held-out test set of 10 patients, balanced by anatomy: chest C121, C135, C170, C249, C280; abdomen L006, L107, L220, L221, L241. Pilot screening used a disjoint 8/4 train/validation patient subset, with all screening physics metrics computed on validation patients only --- no test leakage. Preprocessing follows the benchmark preset: HU window $-1024$ to $1900$, standardization mean $481.4542$ / std $502.1851$ (offset 1024), $128 \times 128$ training patches, batch size 73. NPS estimation uses central $320 \times 320$ crops. The real-noise reference is the residual $\mathrm{LDCT} - \mathrm{NDCT}$.
+Mayo Clinic Low Dose CT dataset (AAPM Low Dose CT Grand Challenge;~\cite{mccollough2017}), accessed and split via the ldct-benchmark tooling~\cite{eulig2024} to guarantee protocol comparability (100p split). Held-out test set of 10 patients, balanced by anatomy: chest C121, C135, C170, C249, C280; abdomen L006, L107, L220, L221, L241. Pilot screening used a disjoint 8/4 train/validation patient subset, with all screening physics metrics computed on validation patients only --- no test leakage. Preprocessing follows the benchmark preset: HU window $-1024$ to $1900$, standardization mean $481.4542$ / std $502.1851$ (offset 1024), $128 \times 128$ training patches, batch size 73. NPS estimation uses central $320 \times 320$ crops. The reference-noise estimate is the paired residual $\mathrm{LDCT} - \mathrm{NDCT}$ (see the assumption stated in Sec.~\ref{sec:objective}).
 
 \subsection{Matched-budget protocol}
 \label{sec:protocol}
@@ -44,14 +44,14 @@ S4 & adaptive, frz-DC 2 & 0.005 & 0.2 & Saturation diagnostic \\
 \subsection{Metrics}
 \label{sec:metrics}
 
-Image quality: PSNR, SSIM, VIF, RMSE\textsubscript{HU}. Physical fidelity (removed noise $= x - \hat{x}$, real noise $= \mathrm{LDCT} - \mathrm{NDCT}$, central $320 \times 320$ crops):
+Image quality: PSNR, SSIM, VIF, RMSE\textsubscript{HU}. Physical fidelity (removed noise $= x - \hat{x}$, reference noise $= \mathrm{LDCT} - \mathrm{NDCT}$, central $320 \times 320$ crops):
 
 \begin{enumerate}
-  \item \textbf{\npsl{} ($\downarrow$)} --- $L_1$ distance between radially averaged log noise-power spectra of removed vs.\ real noise; the primary spectral-fidelity metric.
+  \item \textbf{\npsl{} ($\downarrow$)} --- $L_1$ distance between radially averaged log noise-power spectra of removed vs.\ reference noise; the \textbf{pre-specified primary endpoint} of the study. All formal statistical claims refer to this metric; the remaining metrics are reported as secondary, descriptive evidence.
   \item \textbf{\npsc{} ($\uparrow$)} --- Pearson correlation of the radial NPS curves; spectral shape fidelity independent of magnitude.
-  \item \textbf{\stdr{} ($\rightarrow 1$)} --- std of removed noise / std of real noise; below 1 means residual noise left in the image, above 1 means anatomy erased as ``noise''.
+  \item \textbf{\stdr{} ($\rightarrow 1$)} --- std of removed noise / std of reference noise; below 1 means residual noise left in the image, above 1 means anatomy erased as ``noise''.
   \item \textbf{Per-tissue HU bias ($\rightarrow 0$\hu{})} --- mean signed error within the fixed HU bins of Sec.~\ref{sec:objective}; directly clinically interpretable.
 \end{enumerate}
 
 \paragraph{Reporting rule --- always per anatomy.}
-Overall aggregates can cancel: C2's overall bone bias of $-2.0$\hu{} hides chest $-18.3$ / abdomen $+14.3$\hu{}. All tables report chest and abdomen separately; overall values are shown for convenience only. Statistical testing: paired per-patient Wilcoxon signed-rank tests ($n = 10$, two-sided; a 10/10 sweep yields the exact minimum $p = 0.002$).
+Overall aggregates can cancel: C2's overall bone bias of $-2.0$\hu{} hides chest $-18.3$ / abdomen $+14.3$\hu{}. All tables report chest and abdomen separately; overall values are shown for convenience only. Statistical testing: paired per-patient Wilcoxon signed-rank tests on the primary endpoint ($n = 10$, two-sided; a 10/10 sweep yields the exact minimum $p = 0.002$). Seeds are repeated trainings evaluated on the same 10 patients, so we test within each seed rather than pooling: ``30/30'' throughout the paper means 30 patient--seed comparisons (10 patients $\times$ 3 seeds), not 30 independent patients.
