@@ -7,7 +7,7 @@
 \subsection{A classically strong baseline is physically broken}
 \label{sec:audit}
 
-Our C0 reproduction is consistent with the published benchmark RED-CNN given the deliberately reduced budget (chest SSIM ${\approx} 0.58$ vs.\ 0.609 published at $3\times$ budget; abdomen 0.910 vs.\ 0.903)~\cite{eulig2024}. Classically, C0 is the strongest configuration in the study --- yet physically it is broken in exactly the ways Sec.~\ref{sec:intro} predicts for appearance-only training: 16\% of the noise magnitude is left unremoved overall (26\% in the abdomen); the abdominal NPS shows a ${\sim}7\times$ low-frequency under-removal hole (directly visible in Fig.~\ref{fig:nps_abd}) and a spectral-shape correlation of only 0.51; and calibration errors invisible to PSNR/SSIM appear in every dense tissue class --- chest bone $-53.2$\hu{}, chest fat/low-density $+73.1$\hu{}, dense tissue $-28.7$\hu{} overall (Table~\ref{tab:baseline}).
+Our C0 reproduction is consistent with the published benchmark RED-CNN given the deliberately reduced budget (chest SSIM ${\approx} 0.58$ vs.\ 0.609 published at $3\times$ budget; abdomen 0.910 vs.\ 0.903)~\cite{eulig2024}. Classically, C0 is the strongest configuration in the study --- yet physically it is broken in exactly the ways Sec.~\ref{sec:intro} predicts for appearance-only training: 16\% of the noise magnitude is left unremoved overall (26\% in the abdomen); the abdominal NPS shows a ${\sim}7\times$ low-frequency under-removal hole (directly visible in Fig.~\ref{fig:nps}b) and a spectral-shape correlation of only 0.51; and calibration errors invisible to PSNR/SSIM appear in every dense tissue class --- chest bone $-53.2$\hu{}, chest fat/low-density $+73.1$\hu{}, dense tissue $-28.7$\hu{} overall (Table~\ref{tab:baseline}).
 
 \begin{table}[!tbp]
 \centering
@@ -84,7 +84,7 @@ VIF (seed 0) & 0.2989 & 0.2988 & $=$ \\
 \end{tabular}}
 \end{table}
 
-At equal incentives the head wins the primary spectral metric on \textbf{all 10 test patients in every one of the three seeds} (30/30; two-sided per-seed Wilcoxon signed-rank $p = 0.002$), together with \stdr{} (3/3 seeds), chest bone bias (3/3), and \npsc{} (2/3) --- coherently across both anatomies, at equal-or-better classical quality. The architectural contribution is real, reproducible across seeds, and not attributable to loss weights.
+At equal incentives the head wins the pre-specified primary endpoint on \textbf{all 10 test patients in each of the three seeds} (30/30 patient--seed comparisons; exact two-sided Wilcoxon signed-rank $p = 0.002$ within each seed), together with \stdr{} (3/3 seeds), chest bone bias (3/3), and \npsc{} (2/3) --- coherently across both anatomies, at equal-or-better classical quality. The architectural contribution is real, reproducible across seeds, and not attributable to loss weights.
 
 Figure~\ref{fig:nps} makes the mechanism visible. In the chest (Fig.~\ref{fig:nps}a), the head closes the low-frequency under-removal dip almost completely: the removed-noise NPS of RED-CNN+Spectral is nearly indistinguishable from the reference-noise curve across the spectrum, consistent with chest \npsl{} dropping below 0.1. In the abdomen (Fig.~\ref{fig:nps}b), where the baseline's low-frequency hole is most severe (${\sim}7\times$ at 0.05--0.1 cycles/pixel), the head recovers most of the missing low-frequency noise power; a residual low--mid-frequency gap remains --- consistent with the abdominal \stdr{} of ${\approx}0.89$ --- together with a slight overshoot above 0.6 cycles/pixel.
 
@@ -107,7 +107,7 @@ Figure~\ref{fig:nps} makes the mechanism visible. In the chest (Fig.~\ref{fig:np
 \subsection{The loss ceiling}
 \label{sec:ceiling}
 
-Without the head, doubling $\wnps$ from 0.005 to 0.01 makes everything worse (Table~\ref{tab:ceiling}). With the head, the same $\wnps = 0.01$ yields the best physics in the study (Table~\ref{tab:attribution}). The gradient signal exists, but the trunk has no mechanism to express targeted spectral corrections; the head provides exactly those degrees of freedom.
+Without the head, doubling $\wnps$ from 0.005 to 0.01 makes everything worse (Table~\ref{tab:ceiling}). With the head, the same $\wnps = 0.01$ yields the best physics in the study (Table~\ref{tab:attribution}). The gradient signal exists, but the tested trunk, under this matched training setup, cannot exploit the stronger spectral incentive without degradation; the head provides exactly the missing low-dimensional degrees of freedom.
 
 \begin{table}[!tbp]
 \centering
