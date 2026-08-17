@@ -15,7 +15,7 @@
 \subsection{Trunk-agnostic residual interface}
 \label{sec:interface}
 
-Let $x$ be the LDCT input and $B$ any denoising trunk. We define the removed noise $\hat{n} = x - B(x)$ and produce the final output $\hat{x} = x - H(\hat{n};\, x)$, where $H$ is the spectral head. Because the interface requires only the pair $(x, B(x))$, the head attaches to any denoiser --- CNN, GAN generator, or transformer --- without modifying the trunk. All main results use a benchmark-faithful RED-CNN trunk as the representative testbed (Sec.~\ref{sec:related}).
+Let $x$ be the LDCT input and $B$ any denoising trunk. We define the removed noise $\hat{n} = x - B(x)$ and produce the final output $\hat{x} = x - H(\hat{n};\, x)$, where $H$ is the spectral head. Because the interface requires only the pair $(x, B(x))$, the head attaches to any denoiser --- CNN, GAN generator, or transformer --- without modifying the trunk. The interface is trunk-agnostic; whether the learned trunk--head equilibrium is beneficial must be measured per trunk (Sec.~\ref{sec:crosstrunk}). All main results use a benchmark-faithful RED-CNN trunk as the representative testbed (Sec.~\ref{sec:related}).
 
 \subsection{The DC-preserving radial spectral head}
 \label{sec:head}
@@ -23,9 +23,9 @@ Let $x$ be the LDCT input and $B$ any denoising trunk. We define the removed noi
 $H$ multiplies the 2-D Fourier transform of $\hat{n}$ by a learnable radial gain curve $G(|f|)$, parameterized by 32 log-gain knots interpolated over radial frequency bins. Four structural guarantees hold per image, by construction rather than by training:
 
 \begin{enumerate}
-  \item \textbf{Exact DC preservation.} The gain applies to non-zero frequencies only; the spatial mean (global HU level) of the residual is untouched. Provable, not learned.
-  \item \textbf{Near-DC freezing.} The first two knots are pinned at $G = 1$, protecting large-area regional HU means. This constraint was introduced after diagnosing a $-7$\hu{} regional chest soft-tissue bias and faint concentric rings caused by a sharp gain step adjacent to DC (chest soft-tissue bias $-7.0 \rightarrow -3.5$\hu{} after freezing).
-  \item \textbf{Radial parameterization.} The curve is 32 scalars --- isotropic, interpretable, directly plottable; the head cannot hallucinate anatomical structure.
+  \item \textbf{Exact DC preservation of the residual correction.} The gain applies to non-zero frequencies only, so the head cannot alter the spatial mean of the removed residual: the global HU level of $\hat{x}$ equals that of the trunk output $B(x)$ exactly. Provable, not learned. We state the scope precisely: this guarantees that the \emph{head} introduces no global HU shift; it does not by itself guarantee absolute HU calibration of the final image, since the trunk may carry its own global bias --- that bias is targeted by the HU-bin loss (Sec.~\ref{sec:objective}), not by this constraint.
+  \item \textbf{Near-DC freezing.} The first two knots are pinned at $G = 1$, removing the head's capacity to alter large-area regional HU means --- a capacity restriction on the correction, not a correctness guarantee on regional calibration. This constraint was introduced after diagnosing a $-7$\hu{} regional chest soft-tissue bias and faint concentric rings caused by a sharp gain step adjacent to DC (chest soft-tissue bias $-7.0 \rightarrow -3.5$\hu{} after freezing).
+  \item \textbf{Radial parameterization.} The curve is 32 scalars --- isotropic, interpretable, directly plottable. The head introduces no new directional frequency content and restricts the correction to an isotropic modulation of the predicted residual; it cannot synthesize image content the way an unconstrained generative decoder can.
   \item \textbf{Bounded adaptivity.} Per-image offsets pass through $\tanh$ with $|\Delta \log G| \le 0.25$; frozen bins receive zero offset.
 \end{enumerate}
 
@@ -49,7 +49,7 @@ L = L_{\mathrm{MSE}} + \wnps \cdot L_{\mathrm{NPS}} + \whu \cdot L_{\mathrm{HUbi
 \end{equation}
 
 \paragraph{Radial NPS loss.}
-$L_{\mathrm{NPS}}$ matches the radially averaged log noise-power spectrum of the removed noise $x - \hat{x}$ to that of the real noise $\mathrm{LDCT} - \mathrm{NDCT}$, penalizing both over-removal and the characteristic low-frequency under-removal hole left by appearance-trained trunks.
+$L_{\mathrm{NPS}}$ matches the radially averaged log noise-power spectrum of the removed noise $x - \hat{x}$ to that of the reference noise $\mathrm{LDCT} - \mathrm{NDCT}$, penalizing both over-removal and the characteristic low-frequency under-removal hole left by appearance-trained trunks. We say \emph{reference noise} deliberately: the paired residual is the standard supervised noise surrogate, but strictly it contains all differences between the two reconstructions (including reconstruction nonlinearities and minor anatomical or resolution discrepancies), not detector noise alone; treating it as the noise reference is the standing assumption of the paired-supervised setting.
 
 \paragraph{HU-bin bias loss.}
 $L_{\mathrm{HUbin}}$ penalizes the mean signed error within fixed physical HU bins with boundaries $(-1024, -500, -200, 200, 600, 1900)$\hu{} --- air/lung, fat/low-density, soft tissue, dense tissue, bone --- directly targeting per-tissue calibration.
