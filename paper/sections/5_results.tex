@@ -148,7 +148,7 @@ S4 & 0.1461 & 0.4741 & 0.8951 & 0.6576 & 0.9677 & 0.8316 & $-8.41$ & $-37.64$ & 
 \end{tabular}
 \end{table*}
 
-S4b brings chest \npsl{} below 0.1 for the first time in the study, with chest \npsc{} 0.932 and \stdr{} 0.988 --- chest noise texture is near-perfectly preserved (Table~\ref{tab:physics}). The systematic abdomen bone-bias flip (${\approx}{+}11$\ldots${+}15$\hu{}) appears in every configuration containing the HU-bin loss and is documented as a limitation (Sec.~\ref{sec:limitations}), not hidden in aggregates.
+S4b brings chest \npsl{} below 0.1 for the first time in the study, with chest \npsc{} 0.932 and \stdr{} 0.988 --- chest noise texture is closely matches the reference noise magnitude and spectral shape preserved (Table~\ref{tab:physics}). The systematic abdomen bone-bias flip (${\approx}{+}11$\ldots${+}15$\hu{}) appears in every configuration containing the HU-bin loss and is documented as a limitation (Sec.~\ref{sec:limitations}), not hidden in aggregates.
 
 Qualitative panels (Figs.~\ref{fig:qual_chest}--\ref{fig:qual_abd}) confirm that the physics gains cost nothing visible. ROI mean HU values of both denoisers sit within a few HU of the NDCT reference in soft-tissue and lung ROIs, and the head brings ROI noise magnitude slightly closer to the reference (kidney ROI std 86.6 vs.\ 85.9\hu{}, NDCT 87.3). The difference maps are more diagnostic than the images themselves: the baseline's residual is a broad, spatially unstructured speckle --- the unremoved low-frequency noise of Fig.~\ref{fig:nps} seen in image space --- whereas the head's residual is visibly reduced in homogeneous regions and concentrates at anatomical edges, exactly what a radial spectral correction of the residual can and cannot fix.
 
