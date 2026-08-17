@@ -8,10 +8,10 @@
 \label{sec:claims}
 
 \paragraph{Claim 1 --- the architectural contribution is real, isolable, and reproducible.}
-At strictly matched budgets and loss weights, adding only the head improves the physics metrics coherently across both anatomies at equal classical quality (Table~\ref{tab:attribution}), winning the primary spectral metric on all 30 patient--seed comparisons (10/10 patients in each of three seeds, $p = 0.002$ per seed). On the RED-CNN testbed this claim is multi-seed; its cross-trunk scope is bounded explicitly in Sec.~\ref{sec:crosstrunk}.
+At strictly matched budgets and loss weights, adding only the head improves the physics metrics coherently across both anatomies at equal classical quality (Table~\ref{tab:attribution}), winning the pre-specified primary endpoint on all 30 patient--seed comparisons (10/10 patients in each of three seeds, exact Wilcoxon $p = 0.002$ within each seed). On the RED-CNN testbed this claim is multi-seed; its cross-trunk scope is bounded explicitly in Sec.~\ref{sec:crosstrunk}.
 
 \paragraph{Claim 2 --- losses alone hit a ceiling; the head raises it.}
-The loss-only recipe peaks at $\wnps = 0.005$; doubling the incentive without the head degrades physics and image quality, while the same doubled incentive with the head yields the study's best physics (Sec.~\ref{sec:ceiling}). The trunk lacks a mechanism to express targeted spectral corrections; the head provides those degrees of freedom, decoupled from anatomy reconstruction.
+The loss-only recipe peaks at $\wnps = 0.005$; doubling the incentive without the head degrades physics and image quality, while the same doubled incentive with the head yields the study's best physics (Sec.~\ref{sec:ceiling}). Under the matched setup, the tested trunk could not exploit the stronger incentive without degradation; the head provides the missing low-dimensional degrees of freedom, decoupled from anatomy reconstruction.
 
 \paragraph{Claim 3 --- guaranteed, measurable anatomy-adaptivity.}
 The adaptive head learns chest/abdomen-distinct gain curves (separation ${\approx}4\times$ within-anatomy spread) while every image retains exact DC preservation and frozen near-DC gains (Sec.~\ref{sec:adaptivity}).
@@ -41,8 +41,10 @@ With appearance-only training, seeds that are classically indistinguishable (PSN
   \item \textbf{Abdominal \npsc{} trade-off}: spectral magnitude fidelity partially trades against shape correlation (0.67 vs.\ C0's 0.51 improved, but not uniformly across rounds).
   \item \textbf{Small cohort}: 10 test patients, single dataset, single dose level --- external generalization untested.
   \item \textbf{Possible faint concentric-ring artifacts} in difference maps (spectral binning); mitigated by near-DC freezing; monitored in the final figure pass.
-  \item \textbf{No reader study or task-based assessment} --- physics metrics are reproducible surrogates, not observer performance.
+  \item \textbf{No reader study or task-based assessment} --- physics metrics are reproducible surrogates, not observer performance; task-based model-observer evaluation~\cite{xu2025} is the appropriate next validation step.
   \item \textbf{Head benefit is trunk-dependent.} The ResNet replication (Sec.~\ref{sec:crosstrunk}) shows the losses transfer fully, but the head --- with hyperparameters tuned on RED-CNN and applied unchanged --- concedes the radial-NPS fit on the residual trunk. Per-trunk tuning of the head's constraints (e.g.\ stronger high-frequency gain regularization or high-band freezing) is untested; earlier preliminary runs on other trunk architectures suggested qualitatively similar head benefits but could not be completed under the full protocol due to compute constraints and are therefore not reported.
+  \item \textbf{Radial-only spectral modeling.} Both the NPS metric and the head are radially averaged/isotropic: $G(|f|)$ cannot represent or correct anisotropic or shift-variant CT noise, which is well documented for clinical reconstructions; an angular or elliptical gain parameterization is the natural architectural extension.
+  \item \textbf{Design hyperparameters not swept.} The knot count (32), the number of frozen near-DC bins (2), the offset bound ($|\Delta \log G| \le 0.25$), and the centering weight (0.05) were fixed by pilot diagnosis rather than by sensitivity sweeps; their sensitivity is untested at full budget.
 \end{enumerate}
 
 \subsection{Positioning}
